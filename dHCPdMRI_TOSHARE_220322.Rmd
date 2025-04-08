@@ -1,0 +1,6097 @@
+---
+title: "dHCP FBA ANALYSIS - RMARKDOWN FILE"
+author: "Alexandra Lautarescu"
+date: "05/10/2021"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 5
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '5'
+---
+
+This is an RMarkdown file summarising the analysis for the "Maternal depressive symptoms, neonatal white matter, and toddler social-emotional development"
+
+Some of the lengthy outputs will be hidden from the final PDF, as the document would otherwise be unmanageably long. 
+
+# SETTING UP ENVIRONMENT
+
+Loading necessary packages. Suppressing messages from appearing in RMarkdown doc, as they take up a large amount of space. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(ggplot2)
+library(janitor)
+library(dplyr)
+library(writexl)
+library(psych)
+library(Hmisc)
+library(plyr)
+library(ggExtra)
+library(doBy)
+library(grid)
+library(car)
+library(emmeans)
+library(sjPlot)
+library(tidyverse)
+library(stargazer)
+library(visreg)
+library(PupillometryR)
+library(cowplot)
+library(mediation)
+library(gvlma)
+library(lmtest)
+library(e1071)
+library(sandwich)
+library(broom)
+library(robustbase)
+library(MeMoBootR)
+```
+
+To turn off scientific notation: 
+```{r}
+options(scipen=999) 
+```
+
+Set theme for future plots 
+```{r}
+theme_set(
+        theme_minimal((base_size = 16)) +
+                theme(legend.position = "right"))
+```
+
+# LOADING DATAFRAME 
+
+# INITIAL CLEANING 
+
+Loading dataframe
+```{r}
+DATAFRAME <-read.csv("dHCP_DATAFRAME.csv", header=TRUE, 
+                     na.strings=c("","NA", " ", "not known", "-997", "-998",
+                                  "-999", "-996"))
+```
+
+Checked structure using the commands below, ran in the console instead: 
+DATAFRAME 
+str(DATAFRAME, list.len = ncol(DATAFRAME))
+
+
+Changing the type of relevant variables 
+```{r}
+DATAFRAME$Shard_ParticipantID <- as.character(DATAFRAME$Shard_ParticipantID)
+
+DATAFRAME$AL_HistoryAny <- factor(DATAFRAME$AL_HistoryAny, levels=c(0,1),
+                                                 labels=c("No", "Yes"))
+DATAFRAME$AL_HistoryAnyDummy <- factor(DATAFRAME$AL_HistoryAnyDummy, 
+                                       levels=c(0,1),
+                                                 labels=c("0", "1"))
+DATAFRAME$AL_HistoryDepression <- factor(DATAFRAME$AL_HistoryDepression, 
+                                         levels=c(0,1),
+                                                 labels=c("No", "Yes"))
+DATAFRAME$AL_HistoryAnx <- factor(DATAFRAME$AL_HistoryAnx, levels=c(0,1),
+                                                 labels=c("No", "Yes"))
+DATAFRAME$PsychMeds_YesNo <- factor(DATAFRAME$PsychMeds_YesNo,
+                                    levels=c(0,1),
+                                                 labels=c("No", "Yes"))
+DATAFRAME$PsychMeds_Details <- as.character(DATAFRAME$PsychMeds_Details) 
+
+DATAFRAME$AL_EPDS_Highest_11orMore <- factor(DATAFRAME$AL_EPDS_Highest_11orMore, 
+                                             levels=c(0,1),
+                                                 labels=c("Low", "High"))
+
+DATAFRAME$Shard_Sedation <- factor(DATAFRAME$Shard_Sedation, levels=c(0,1),
+                                                 labels=c("No", "Yes"))
+
+DATAFRAME$Shard_Sex <- factor(DATAFRAME$Shard_Sex, levels=c(1,2),
+                                                 labels=c("Male", "Female"))
+
+DATAFRAME$Shard_Sex_Dummy <- factor(DATAFRAME$Shard_Sex_Dummy, levels=c(0,1),
+                                                 labels=c("0", "1"))
+DATAFRAME$Shard_AL_Notes <- as.character(DATAFRAME$Shard_AL_Notes)
+
+DATAFRAME$AL_Check_ShardRecon03 <- as.character(DATAFRAME$AL_Check_ShardRecon03)
+
+DATAFRAME$AL_Comments_Shard3 <- as.character(DATAFRAME$AL_Comments_Shard3)
+
+DATAFRAME$AL_RadiologyShard03NotComplete <- as.character(DATAFRAME$AL_RadiologyShard03NotComplete)
+
+DATAFRAME$mother_smokingyn_enrolment_arm_1 <- factor(DATAFRAME$mother_smokingyn_enrolment_arm_1,
+                                                     levels=c(0,1,2),
+                                                     labels=c("No","Yes","No, stopped"))
+
+DATAFRAME$mother_alcoholyn_enrolment_arm_1 <- factor(DATAFRAME$mother_alcoholyn_enrolment_arm_1,
+                                                     levels=c(0,1),labels=c("No","Yes"))
+
+DATAFRAME$mother_substance_use_enrolment_arm_1 <- factor(DATAFRAME$mother_substance_use_enrolment_arm_1,
+                                                         levels=c(0,1),labels=c("No","Yes"))
+
+DATAFRAME$mother_ethnicity_enrolment_arm_1 <- factor(DATAFRAME$mother_ethnicity_enrolment_arm_1,
+                                                     levels=c(1,2,3,4,5,6,7,8,9,10,11,
+                                                              12,13,14,15,16,17,18),
+                                                     labels=c("White British",
+                                                              "White Irish",
+                                                              "White-Gypsy/Traveller",
+                                                              "White Other",
+                                                              "Asian/Asian British-Indian", 
+                                                              "Asian/Asian British - Pakistani",
+                                                              "Asian/Asian British-Bangladeshi", 
+                                                              "Asian/Asian British-Other", 
+                                                              "White and Asian", 
+                                                              "Black/Black British-African",
+                                                              "Black/Black British-Carribean",
+                                                              "White and Black African",
+                                                              "White and Black Carribean", 
+                                                              "Chinese", 
+                                                              "Black/Black British-Other", 
+                                                              "Any other mixed ethnic group", 
+                                                              "Other-Any other ethnic group",
+                                                              "Do not wish to answer"))
+
+DATAFRAME$mother_eng_first_lan_enrolment_arm_1<- factor(DATAFRAME$mother_eng_first_lan_enrolment_arm_1,
+                                                        levels=c(0,1),labels=c("No","Yes"))
+
+DATAFRAME$baby_delivery_method_baby_born_arm_1 <- factor(DATAFRAME$baby_delivery_method_baby_born_arm_1,
+                                                         levels=c(1,2,3,4,5,6,7),
+                                                 labels=c("Spontaneous vaginal delivery", 
+                                                          "Emergency caesarian section - in labour", 
+                                                          "Emergency caesarian section - not in labour", 
+                                                          "Elective caesarian section",
+                                                          "Instrumental delivery - Forceps", 
+                                                          "Instrumental delivery - Ventous", 
+                                                          "Semi Elective Caesarian Section"))
+
+DATAFRAME$baby_gender_baby_born_arm_1 <- factor(DATAFRAME$baby_gender_baby_born_arm_1,
+                                                 levels=c(1,2),
+                                                 labels=c("Male", "Female"))
+
+DATAFRAME$baby_admitted_to_nicu_baby_born_arm_1 <- factor(DATAFRAME$baby_admitted_to_nicu_baby_born_arm_1,
+                                                          levels=c(0,1),
+                                                          labels=c("No", "Yes"))
+
+
+DATAFRAME$Risk_Group <- factor(DATAFRAME$Risk_Group, levels=c(0,1,2,3),
+                                                 labels=c("Low risk - Neither",
+                                                          "Moderate risk - History",
+                                                          "Moderate risk - Depression",
+                                                          "High risk - Depression & History"))
+
+DATAFRAME$imdquintile_18m_arm_1 <- factor(DATAFRAME$imdquintile_18m_arm_1, 
+                                          levels=c(1,2,3,4,5), 
+                                          labels=c("1st","2nd","3rd","4th","5th"))
+```
+
+Checked again in console: 
+str(DATAFRAME, list.len = ncol(DATAFRAME))
+
+
+# DESCRIPTIVES 
+
+Checking distributions, and getting descriptive statistics 
+
+# GA AND PMA 
+
+```{r}
+hist(DATAFRAME$Shard_GA_at_birth)
+```
+Skewed to the right 
+
+```{r}
+psych::describe(DATAFRAME$Shard_GA_at_birth)
+```
+Values ok, no outliers
+
+
+```{r}
+describeBy(x=DATAFRAME$Shard_GA_at_birth, group=DATAFRAME$AL_EPDS_Highest_11orMore)
+```
+
+```{r}
+hist(DATAFRAME$Shard_GA_at_scan)
+```
+
+
+```{r}
+psych::describe(DATAFRAME$Shard_GA_at_scan)
+```
+
+```{r}
+psych::describeBy(x=DATAFRAME$Shard_GA_at_scan, group=DATAFRAME$AL_EPDS_Highest_11orMore)
+```
+
+Plot GA and PMA 
+  
+```{r}
+scatterGA_PMA <- ggplot(DATAFRAME, aes(x=Shard_GA_at_birth, y=Shard_GA_at_scan,
+                                       colour=AL_EPDS_Highest_11orMore)) +
+  geom_jitter(alpha=0.8, position=position_jitter(0.2), size=1.3, 
+              aes(shape=AL_EPDS_Highest_11orMore))+ 
+  scale_x_continuous(name="Gestational age at birth (weeks)",
+                     limits=c(32,43), breaks=c(32,33,34,35,36,37,38,39,40,41,42,43)) + 
+  scale_y_continuous(name="Postmenstrual age at scan (weeks)",
+                     limits=c(36,45), breaks=c(36,37,38,39,40,41,42,43,44,45)) +
+  theme(text=element_text(size=15), legend.position="none", aspect.ratio=1) +
+  scale_color_manual(values=c('paleturquoise4','violetred')) + 
+  scale_shape_manual(values = c(1, 2))
+
+scatterGA_PMA
+
+```
+
+```{r}
+scatterGA_PMA_marg <- ggMarginal(scatterGA_PMA, type = "histogram", alpha=0.1, 
+                                 groupColour=TRUE, groupFill= TRUE)
+```
+
+
+```{r}
+grid.newpage()
+grid.draw(scatterGA_PMA_marg)
+```
+
+# Descriptives for continuous variables
+
+Checking histograms for distribution, and getting descriptives statistics
+
+```{r}
+hist(DATAFRAME$imdscaore_18m_arm_1)
+```
+
+```{r}
+psych::describe(DATAFRAME$imdscaore_18m_arm_1)
+```
+
+
+```{r}
+psych::describeBy(x=DATAFRAME$imdscaore_18m_arm_1, 
+                  group=DATAFRAME$AL_EPDS_Highest_11orMore)
+```
+
+```{r}
+hist(DATAFRAME$AL_IMD_Neonatal)
+```
+
+```{r}
+psych::describe(DATAFRAME$AL_IMD_Neonatal)
+```
+
+```{r}
+psych::describeBy(x=DATAFRAME$AL_IMD_Neonatal, group=DATAFRAME$AL_EPDS_Highest_11orMore)
+```
+
+
+```{r}
+hist(DATAFRAME$AL_EPDS_HIGHEST)
+```
+
+```{r}
+psych::describe(x=DATAFRAME$AL_EPDS_HIGHEST)
+```
+
+
+```{r}
+psych::describeBy(x=DATAFRAME$AL_EPDS_HIGHEST, group=DATAFRAME$AL_EPDS_Highest_11orMore)
+```
+
+
+```{r}
+hist(DATAFRAME$mother_age_enrolment_arm_1)
+```
+
+```{r}
+psych::describe(x=DATAFRAME$mother_age_enrolment_arm_1)
+```
+
+```{r}
+psych::describeBy(x=DATAFRAME$mother_age_enrolment_arm_1,
+                  group=DATAFRAME$AL_EPDS_Highest_11orMore)
+```
+
+
+```{r}
+hist(DATAFRAME$mother_bmi.enrolment_arm_1)
+```
+
+```{r}
+psych::describe(x=DATAFRAME$mother_bmi.enrolment_arm_1)
+```
+
+```{r}
+psych::describeBy(x=DATAFRAME$mother_bmi.enrolment_arm_1, 
+                  group=DATAFRAME$AL_EPDS_Highest_11orMore)
+```
+
+```{r}
+hist(DATAFRAME$AL_EPDS3A_Highest)
+```
+
+```{r}
+psych::describe(x=DATAFRAME$AL_EPDS3A_Highest)
+```
+
+```{r}
+psych::describeBy(x=DATAFRAME$AL_EPDS3A_Highest, 
+                  group=DATAFRAME$AL_EPDS_Highest_11orMore)
+```
+
+
+Descriptives for dMRI metrics 
+
+```{r}
+hist(DATAFRAME$mean_FD_UF_L)
+```
+
+```{r}
+hist(DATAFRAME$mean_FD_UF_R)
+```
+
+```{r}
+hist(DATAFRAME$mean_FD_CingVent_L)
+```
+
+```{r}
+hist(DATAFRAME$mean_FD_CingVent_R)
+```
+
+```{r}
+hist(DATAFRAME$mean_FD_CingDors_L)
+```
+
+```{r}
+hist(DATAFRAME$mean_FD_CingDors_R)
+```
+
+All normally distributed so reporting mean 
+```{r}
+psych::describe(DATAFRAME$mean_FD_UF_L)
+psych::describe(DATAFRAME$mean_FD_UF_R)
+psych::describe(DATAFRAME$mean_FD_CingVent_L)
+psych::describe(DATAFRAME$mean_FD_CingVent_R)
+psych::describe(DATAFRAME$mean_FD_CingDors_L)
+psych::describe(DATAFRAME$mean_FD_CingDors_R)
+```
+
+```{r}
+hist(DATAFRAME$mean_FDC_UF_L)
+```
+
+```{r}
+hist(DATAFRAME$mean_FDC_UF_R)
+```
+
+```{r}
+hist(DATAFRAME$mean_FDC_CingVent_L)
+```
+
+```{r}
+hist(DATAFRAME$mean_FDC_CingVent_R)
+```
+
+```{r}
+hist(DATAFRAME$mean_FDC_CingDors_L)
+```
+
+```{r}
+hist(DATAFRAME$mean_FDC_CingDors_R)
+```
+
+```{r}
+psych::describe(DATAFRAME$mean_FDC_UF_L)
+psych::describe(DATAFRAME$mean_FDC_UF_R)
+psych::describe(DATAFRAME$mean_FDC_CingVent_L)
+psych::describe(DATAFRAME$mean_FDC_CingVent_R)
+psych::describe(DATAFRAME$mean_FDC_CingDors_L)
+psych::describe(DATAFRAME$mean_FDC_CingDors_R)
+```
+
+```{r}
+hist(DATAFRAME$mean_LOGFC_UF_L)
+```
+
+```{r}
+hist(DATAFRAME$mean_LOGFC_UF_R)
+```
+
+```{r}
+hist(DATAFRAME$mean_LOGFC_CingVent_L)
+```
+
+
+```{r}
+hist(DATAFRAME$mean_LOGFC_CingVent_R)
+```
+
+
+```{r}
+hist(DATAFRAME$mean_LOGFC_CingDors_L)
+```
+
+```{r}
+hist(DATAFRAME$mean_LOGFC_CingDors_R)
+```
+
+
+
+```{r}
+psych::describe(DATAFRAME$mean_LOGFC_UF_L)
+psych::describe(DATAFRAME$mean_LOGFC_UF_R)
+psych::describe(DATAFRAME$mean_LOGFC_CingVent_L)
+psych::describe(DATAFRAME$mean_LOGFC_CingVent_R)
+psych::describe(DATAFRAME$mean_LOGFC_CingDors_L)
+psych::describe(DATAFRAME$mean_LOGFC_CingDors_R)
+```
+
+
+
+# Subsetting for categorical variables 
+```{r}
+DATAFRAME_HighEPDS <- subset(DATAFRAME, AL_EPDS_Highest_11orMore=="High")
+```
+
+str(DATAFRAME_HighEPDS) ran in console
+
+```{r}
+DATAFRAME_LowEPDS <- subset(DATAFRAME, AL_EPDS_Highest_11orMore=="Low")
+```
+
+str(DATAFRAME_LowEPDS) ran in console
+
+# Descriptives for categorical variables 
+```{r}
+Hmisc::describe(DATAFRAME$AL_HistoryAny)
+Hmisc::describe(DATAFRAME_HighEPDS$AL_HistoryAny)
+Hmisc::describe(DATAFRAME_LowEPDS$AL_HistoryAny)
+```
+
+```{r}
+Hmisc::describe(DATAFRAME$PsychMeds_YesNo)
+Hmisc::describe(DATAFRAME_HighEPDS$PsychMeds_YesNo)
+Hmisc::describe(DATAFRAME_LowEPDS$PsychMeds_YesNo)
+```
+
+```{r}
+Hmisc::describe(DATAFRAME$mother_smokingyn_enrolment_arm_1)
+Hmisc::describe(DATAFRAME_HighEPDS$mother_smokingyn_enrolment_arm_1)
+Hmisc::describe(DATAFRAME_LowEPDS$mother_smokingyn_enrolment_arm_1)
+```
+
+```{r}
+Hmisc::describe(DATAFRAME$mother_alcoholyn_enrolment_arm_1)
+Hmisc::describe(DATAFRAME_HighEPDS$mother_alcoholyn_enrolment_arm_1)
+Hmisc::describe(DATAFRAME_LowEPDS$mother_alcoholyn_enrolment_arm_1)
+```
+
+
+```{r}
+Hmisc::describe(DATAFRAME$mother_substance_use_enrolment_arm_1)
+Hmisc::describe(DATAFRAME_HighEPDS$mother_substance_use_enrolment_arm_1)
+Hmisc::describe(DATAFRAME_LowEPDS$mother_substance_use_enrolment_arm_1)
+```
+
+```{r}
+Hmisc::describe(DATAFRAME$AL_IMD_NeonatalQuintile)
+Hmisc::describe(DATAFRAME_HighEPDS$AL_IMD_NeonatalQuintile)
+Hmisc::describe(DATAFRAME_LowEPDS$AL_IMD_NeonatalQuintile)
+```
+
+These results are hidden to protect participant identity
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(DATAFRAME$mother_ethnicity_enrolment_arm_1)
+summary(DATAFRAME_HighEPDS$mother_ethnicity_enrolment_arm_1)
+summary(DATAFRAME_LowEPDS$mother_ethnicity_enrolment_arm_1)
+```
+
+
+
+```{r}
+summary(DATAFRAME$baby_delivery_method_baby_born_arm_1)
+summary(DATAFRAME_HighEPDS$baby_delivery_method_baby_born_arm_1)
+summary(DATAFRAME_LowEPDS$baby_delivery_method_baby_born_arm_1)
+```
+
+```{r}
+Hmisc::describe(DATAFRAME$baby_gender_baby_born_arm_1)
+Hmisc::describe(DATAFRAME_HighEPDS$baby_gender_baby_born_arm_1)
+Hmisc::describe(DATAFRAME_LowEPDS$baby_gender_baby_born_arm_1)
+```
+
+
+Checking the relationship between fixel based metrics and GA at scan 
+
+Example for publication: 
+```{r}
+plot1<- ggplot(DATAFRAME, 
+               aes(x=Shard_GA_at_scan, y=mean_FD_UF_L,color=baby_gender_baby_born_arm_1, 
+                   shape=baby_gender_baby_born_arm_1)) +
+  geom_point() + 
+  geom_smooth(method=lm)+
+  labs(colour="Sex", shape="Sex")+
+  scale_x_continuous(name="PMA at scan", limits=c(36,45),
+                     breaks=c(36,37,38,39,40,41,42,43,44,45))+
+  scale_y_continuous(name="Mean FD Left Uncinate", limits=c(.13,.28), 
+                     breaks=c(.13, .15, .17, .19, .21, .23, .25, .27))+
+        scale_colour_manual(values=c("deepskyblue","darkorange"))
+plot1
+```
+
+Other plots for visualisation and QC 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot2<- ggplot(DATAFRAME, 
+               aes(x=Shard_GA_at_scan, y=mean_FD_UF_R,color=baby_gender_baby_born_arm_1, 
+                   shape=baby_gender_baby_born_arm_1)) +
+  geom_point() +geom_smooth(method=lm)+
+  labs(colour="Sex", shape="Sex")
+plot2
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot3<- ggplot(DATAFRAME, 
+               aes(x=Shard_GA_at_scan, y=mean_FD_CingVent_L,
+                   color=baby_gender_baby_born_arm_1, shape=baby_gender_baby_born_arm_1)) + 
+  geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot3
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot4<- ggplot(DATAFRAME, aes(x=Shard_GA_at_scan, y=mean_FD_CingVent_R,
+                              color=baby_gender_baby_born_arm_1, shape=baby_gender_baby_born_arm_1)) + 
+  geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot4
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot5<- ggplot(DATAFRAME, aes(x=Shard_GA_at_scan, y=mean_FD_CingDors_L,
+                              color=baby_gender_baby_born_arm_1, shape=baby_gender_baby_born_arm_1)) + 
+  geom_point() +geom_smooth(method=lm)+ labs(colour="Sex", shape="Sex")
+plot5
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot6<- ggplot(DATAFRAME, 
+               aes(x=Shard_GA_at_scan, y=mean_FD_CingDors_R,color=baby_gender_baby_born_arm_1,
+                   shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot6
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot7<- ggplot(DATAFRAME, 
+               aes(x=Shard_GA_at_scan, y=mean_FDC_UF_L,color=baby_gender_baby_born_arm_1, 
+                   shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot7
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot8<- ggplot(DATAFRAME, 
+               aes(x=Shard_GA_at_scan, y=mean_FDC_UF_R,color=baby_gender_baby_born_arm_1, 
+                   shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot8
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot9<- ggplot(DATAFRAME, 
+               aes(x=Shard_GA_at_scan, y=mean_FDC_CingVent_L,color=baby_gender_baby_born_arm_1,
+                   shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot9
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot10<- ggplot(DATAFRAME, 
+                aes(x=Shard_GA_at_scan, y=mean_FDC_CingVent_R,color=baby_gender_baby_born_arm_1,
+                    shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+
+  labs(colour="Sex", shape="Sex")
+plot10
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot11<- ggplot(DATAFRAME, 
+                aes(x=Shard_GA_at_scan, y=mean_FDC_CingDors_L,color=baby_gender_baby_born_arm_1,
+                    shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot11
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot12<- ggplot(DATAFRAME, 
+                aes(x=Shard_GA_at_scan, y=mean_FDC_CingDors_R,color=baby_gender_baby_born_arm_1,
+                    shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot12
+```
+
+
+
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot13<- ggplot(DATAFRAME, 
+                aes(x=Shard_GA_at_scan, y=mean_LOGFC_UF_L,color=baby_gender_baby_born_arm_1,
+                    shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot13
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot14<- ggplot(DATAFRAME, 
+                aes(x=Shard_GA_at_scan, y=mean_LOGFC_UF_R,color=baby_gender_baby_born_arm_1, 
+                    shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot14
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot15<- ggplot(DATAFRAME, 
+                aes(x=Shard_GA_at_scan, y=mean_LOGFC_CingVent_L,color=baby_gender_baby_born_arm_1,
+                    shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot15
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot16<- ggplot(DATAFRAME,
+                aes(x=Shard_GA_at_scan, y=mean_LOGFC_CingVent_R,color=baby_gender_baby_born_arm_1,
+                    shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot16
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot17<- ggplot(DATAFRAME, 
+                aes(x=Shard_GA_at_scan, y=mean_LOGFC_CingDors_L,color=baby_gender_baby_born_arm_1,
+                    shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")
+plot17
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot18<- ggplot(DATAFRAME, 
+                aes(x=Shard_GA_at_scan, y=mean_LOGFC_CingDors_R,color=baby_gender_baby_born_arm_1,
+                    shape=baby_gender_baby_born_arm_1)) + geom_point() +geom_smooth(method=lm)+
+  labs(colour="Sex", shape="Sex")
+plot18
+```
+
+
+
+
+# Creating a correlation matrix for variables of interest 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+EPDS_FBA_Matrix = subset(DATAFRAME, 
+                            select=c(AL_EPDS_HIGHEST,Shard_GA_at_birth,Shard_GA_at_scan, 
+                                     AL_IMD_Neonatal,mother_age_enrolment_arm_1, 
+                                     mother_education_enrolment_arm_1, 
+                                     mother_bmi.enrolment_arm_1, 
+                                     Shard_Birth_Weight, ICV_mm3_hasCSF, mean_FD_UF_L,
+                                     mean_FD_UF_R, mean_FD_CingVent_L, mean_FD_CingVent_R, 
+                                     mean_FD_CingDors_L, mean_FD_CingDors_R, mean_FDC_UF_L, 
+                                     mean_FDC_UF_R, mean_FDC_CingVent_L, mean_FDC_CingVent_R, 
+                                     mean_FDC_CingDors_L, mean_FDC_CingDors_R, mean_LOGFC_UF_L, 
+                                     mean_LOGFC_UF_R, mean_LOGFC_CingVent_L, 
+                                     mean_LOGFC_CingVent_R, 
+                                     mean_LOGFC_CingDors_L, mean_LOGFC_CingDors_R))
+
+EPDS_FBA_MatrixFin <- as.matrix(EPDS_FBA_Matrix)
+
+rcorr(EPDS_FBA_MatrixFin, type=c("spearman"))
+```
+
+
+Deciding whether AL_HistoryAny should be included in model. Is it associated with EPDS? 
+```{r}
+group_by(DATAFRAME, AL_HistoryAny) %>%
+  dplyr::summarise(
+    count = n(),
+    mean = mean(AL_EPDS_HIGHEST, na.rm = TRUE),
+    sd = sd(AL_EPDS_HIGHEST, na.rm = TRUE)
+  )
+```
+
+Testing the relationship 
+```{r}
+wilcox.test( formula = AL_EPDS_HIGHEST~AL_HistoryAny, data=DATAFRAME)
+```
+
+Plot for publication
+
+```{r}
+plot1<- ggplot(DATAFRAME, 
+               aes(x=Shard_GA_at_scan, y=mean_FD_UF_L,color=baby_gender_baby_born_arm_1, 
+                   shape=baby_gender_baby_born_arm_1)) + geom_point() +
+  geom_smooth(method=lm)+ 
+  labs(colour="Sex", shape="Sex")+
+  scale_x_continuous(name="GA at scan", limits=c(36,45),
+                     breaks=c(36,37,38,39,40,41,42,43,44,45))+
+  scale_y_continuous(name="Mean FD Left Uncinate", limits=c(.13,.28),
+                     breaks=c(.13, .15, .17, .19, .21, .23, .25, .27))+
+        scale_colour_manual(values=c("deepskyblue","darkorange"))
+plot1
+```
+
+
+
+Raincloud plot for the relationship between history of poor mental health and EPDS
+
+```{r warning=FALSE}
+RaincloudHistDep <- ggplot(DATAFRAME,aes(x=AL_HistoryAny,y=AL_EPDS_HIGHEST, 
+                                           fill = AL_HistoryAny, colour=AL_HistoryAny))+
+  geom_flat_violin(position = position_nudge(x = .25, y = 0),adjust =1)+
+  geom_point(position = position_jitter(width = .2), size = .4)+
+  geom_boxplot(aes(x = as.numeric(AL_HistoryAny)+0.25, y =AL_EPDS_HIGHEST),
+               outlier.shape = NA, alpha = 0.3, width = .1, colour = "BLACK") + 
+  ylab('EPDS score')+xlab('History of poor mental health')+ 
+  scale_y_continuous(limits=c(0,30)) + theme_cowplot()+theme(legend.position="none")+
+  theme(text=element_text(size=14), axis.text.y=element_text(size=14))+
+        scale_colour_manual(values=c("palevioletred","paleturquoise4"))+
+  scale_fill_manual(values=c("palevioletred","paleturquoise4"))
+RaincloudHistDep
+```
+
+Is associated with EPDS so will keep in model. 
+Note: the fibre density models will not have ICV as a covariate; The log(FC) and FDC models will
+
+
+# REGRESSION MODELS
+
+UF_L 
+
+```{r}
+fit_FD_UF_L1 <- lm(mean_FD_UF_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                     Shard_GA_at_scan + AL_IMD_Neonatal + 
+                     AL_HistoryAnyDummy, data=DATAFRAME)
+fit_FD_UF_L2 <- lm(mean_FD_UF_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                     Shard_GA_at_scan + AL_IMD_Neonatal +
+                     AL_HistoryAnyDummy, data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FD_UF_L1)
+```
+
+```{r}
+gvlma(fit_FD_UF_L2)
+```
+
+```{r}
+summary(fit_FD_UF_L1)
+```
+
+
+```{r}
+summary(fit_FD_UF_L2)
+```
+
+```{r}
+library(ggstatsplot)
+set.seed(123)
+mod1<- stats::lm(mean_FD_UF_L ~ Shard_Sex + Shard_GA_at_birth+ 
+                     Shard_GA_at_scan + AL_IMD_Neonatal + 
+                     AL_HistoryAnyDummy, data=DATAFRAME)
+ggcoefstats(x=mod1, point.args=list(size=4),
+            title="Mean FD Left Uncinate predicted by model",
+            exclude.intercept=TRUE )+ 
+  ggplot2::scale_y_discrete(labels=c("EPDS","Sex(female)", "GA at birth",
+                                     "PMA at scan", "IMD", 
+                                     "History poor MH"))+ 
+  ggplot2::labs(x="Regression coefficient", y=NULL)
+```
+```{r}
+ggsave("DotWhisker.pdf", plot=last_plot(), device=NULL, limitsize=FALSE)
+```
+
+
+```{r}
+library(interactions)
+plot_fit_FD_UF_L1 <- interact_plot(fit_FD_UF_L1, pred="AL_EPDS_HIGHEST", modx="Shard_Sex", 
+                                   partial.residuals=TRUE, interval=TRUE, x.label="EPDS", 
+                                   y.label="Mean FD Left Uncinate", legend.main="Sex", 
+                                   colors="CUD Bright", point.size=1)+ 
+  scale_y_continuous(limits=c(.16,.26),
+                           breaks=c(.16,.18,.20,.22,.24,.26))+ scale_x_continuous(limits=c(0,30),breaks=c(0,5,10,15,20,25,30,35))+
+  theme(axis.title=element_text(size=11), aspect.ratio=1)
+plot_fit_FD_UF_L1
+```
+
+
+
+```{r}
+fit_FDC_UF_L1 <- lm(mean_FDC_UF_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                      Shard_GA_at_scan + 
+                      AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+fit_FDC_UF_L2 <- lm(mean_FDC_UF_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+
+                      Shard_GA_at_scan + 
+                      AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FDC_UF_L1)
+```
+
+```{r}
+gvlma(fit_FDC_UF_L2)
+```
+
+```{r}
+summary(fit_FDC_UF_L1)
+```
+
+```{r}
+summary(fit_FDC_UF_L2)
+```
+
+
+```{r}
+library(interactions)
+plot_fit_FDC_UF_L2 <- interact_plot(fit_FD_UF_L2, pred="AL_EPDS_HIGHEST", modx="Shard_Sex", 
+                                    partial.residuals=TRUE, interval=TRUE, x.label="EPDS by Sex", 
+                                    y.label="Mean FDC Left Uncinate", legend.main="Sex", 
+                                    colors="CUD Bright", point.size=1)+ 
+  scale_y_continuous(limits=c(.16,.26),breaks=c(.16,.18,.20,.22,.24,.26))+
+  scale_x_continuous(limits=c(0,30),breaks=c(0,5,10,15,20,25,30,35))+
+  theme(axis.title=element_text(size=11),aspect.ratio=1)
+plot_fit_FDC_UF_L2
+```
+
+The following parameter ~Shard_Sex tells the function that we obtain separate estimates for females and males, and var="AL_EPDS_HIGHEST" tells the function to obtain simple slopes (or trends) for AL_EPDS_HIGHEST. 
+Check 95% confidence interval - if it contains 0, it's not significant. 
+
+To tell the function that we want the pairwise difference in the simple slope of AL_EPDS_HIGHEST for females versus males. P value is exactly the same as interaction in lm above. 
+```{r}
+emtrends(fit_FDC_UF_L2, pairwise~Shard_Sex, var="AL_EPDS_HIGHEST")
+```
+
+
+LogFC
+```{r}
+fit_LOGFC_UF_L1 <- lm(mean_LOGFC_UF_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+
+                        Shard_GA_at_scan + 
+                        AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF, data=DATAFRAME)
+fit_LOGFC_UF_L2 <- lm(mean_LOGFC_UF_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                        Shard_GA_at_scan + 
+                        AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_L1)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_L2)
+```
+
+```{r}
+summary(fit_LOGFC_UF_L1)
+```
+
+```{r}
+summary(fit_LOGFC_UF_L2)
+```
+
+
+
+UF_R
+
+```{r}
+fit_FD_UF_R1 <- lm(mean_FD_UF_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                     Shard_GA_at_scan + 
+                     AL_IMD_Neonatal + AL_HistoryAnyDummy , data=DATAFRAME)
+fit_FD_UF_R2 <- lm(mean_FD_UF_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                     Shard_GA_at_scan + 
+                     AL_IMD_Neonatal + AL_HistoryAnyDummy , data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FD_UF_R1)
+```
+
+```{r}
+gvlma(fit_FD_UF_R2)
+```
+
+```{r}
+summary(fit_FD_UF_R1)
+```
+
+```{r}
+summary(fit_FD_UF_R2)
+```
+
+
+
+```{r}
+library(interactions)
+plot_fit_FD_UF_R1 <- interact_plot(fit_FD_UF_R1, pred="AL_EPDS_HIGHEST", modx="Shard_Sex", 
+                                   partial.residuals=TRUE, interval=TRUE, x.label="EPDS", 
+                                   y.label="Mean FD Right Uncinate", legend.main="Sex", 
+                                   colors="CUD Bright", point.size=1)+ 
+  scale_y_continuous(limits=c(.16,.26), breaks=c(.16,.18,.20,.22,.24,.26))+
+  scale_x_continuous(limits=c(0,30),breaks=c(0,5,10,15,20,25,30,35))+
+  theme(axis.title=element_text(size=11),aspect.ratio=1)
+plot_fit_FD_UF_R1
+```
+
+
+
+
+
+```{r}
+fit_FDC_UF_R1 <- lm(mean_FDC_UF_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                      Shard_GA_at_scan + 
+                      AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF, data=DATAFRAME)
+fit_FDC_UF_R2 <- lm(mean_FDC_UF_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                      Shard_GA_at_scan + 
+                      AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , 
+                    data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FDC_UF_R1)
+```
+
+```{r}
+gvlma(fit_FDC_UF_R2)
+```
+
+```{r}
+summary(fit_FDC_UF_R1)
+```
+
+```{r}
+summary(fit_FDC_UF_R2)
+```
+
+
+
+
+```{r}
+library(interactions)
+plot_fit_FDC_UF_R1 <- interact_plot(fit_FDC_UF_R1, pred="AL_EPDS_HIGHEST", modx="Shard_Sex",
+                                    partial.residuals=TRUE, interval=TRUE, x.label="EPDS", 
+                                    y.label="Mean FDC Right Uncinate", legend.main="Sex", 
+                                    colors="CUD Bright" , point.size=1)+ 
+  scale_y_continuous(limits=c(.16,.26), breaks=c(.16,.18,.20,.22,.24,.26))+
+  scale_x_continuous(limits=c(0,30),breaks=c(0,5,10,15,20,25,30,35))+
+  theme(axis.title=element_text(size=11),aspect.ratio=1)
+plot_fit_FDC_UF_R1
+```
+
+
+
+
+
+```{r}
+fit_LOGFC_UF_R1 <- lm(mean_LOGFC_UF_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                        Shard_GA_at_scan +
+                        AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF, data=DATAFRAME)
+fit_LOGFC_UF_R2 <- lm(mean_LOGFC_UF_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                        Shard_GA_at_scan + 
+                        AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF, data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_R1)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_R2)
+```
+
+```{r}
+summary(fit_LOGFC_UF_R1)
+```
+
+```{r}
+summary(fit_LOGFC_UF_R2)
+```
+
+Plots for uncinate
+
+
+```{r}
+library(ggplot2)
+library(cowplot)
+library(rlang)
+
+prow1 <- plot_grid(
+  plot_fit_FD_UF_L1 + theme(legend.position="none"),
+  plot_fit_FD_UF_R1 + theme(legend.position="none"),
+  nrow=1)
+
+legend1 <- get_legend(plot_fit_FD_UF_L1 + guides(color=guide_legend(nrow=1)) + 
+                        theme(legend.position="bottom"))
+
+grid1 <- plot_grid(prow1, legend1, ncol=1, rel_heights=c(1,.1))
+grid1
+```
+
+
+
+```{r}
+ggsave("UF_FD.pdf", plot=last_plot(), device=NULL)
+```
+
+p2
+```{r}
+library(ggplot2)
+library(cowplot)
+library(rlang)
+
+prow2<- plot_grid(
+  plot_fit_FDC_UF_L2 + theme(legend.position="none"),
+  plot_fit_FDC_UF_R1 + theme(legend.position="none"),
+  nrow=1)
+
+legend2 <- get_legend(plot_fit_FDC_UF_L2 + guides(color=guide_legend(nrow=1)) + 
+                        theme(legend.position="bottom"))
+
+grid2 <- plot_grid(prow2, legend2, ncol=1, rel_heights=c(1,.1))
+grid2
+```
+
+```{r}
+ggsave("UF_FDC.pdf", plot=last_plot(), device=NULL)
+```
+
+
+```{r}
+library(ggplot2)
+library(cowplot)
+library(rlang)
+
+prow3<- plot_grid(
+  plot_fit_FD_UF_L1 + theme(legend.position="none"),
+  plot_fit_FD_UF_R1 + theme(legend.position="none"),
+  plot_fit_FDC_UF_L2 + theme(legend.position="none"),
+  plot_fit_FDC_UF_R1 + theme(legend.position="none"),
+  nrow=2, labels="AUTO")
+
+legend3 <- get_legend(plot_fit_FDC_UF_L2 + guides(color=guide_legend(nrow=1)) + 
+                        theme(legend.position="bottom"))
+
+grid3 <- plot_grid(prow3, legend3, ncol=1, rel_heights=c(1,.1))
+grid3
+```
+
+```{r}
+ggsave("UF_all.pdf", plot=last_plot(), device=NULL)
+```
+
+
+CingDors_L
+
+```{r}
+fit_FD_CingDors_L1 <- lm(mean_FD_CingDors_L~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                           Shard_GA_at_scan +
+                           AL_IMD_Neonatal + AL_HistoryAnyDummy , data=DATAFRAME)
+fit_FD_CingDors_L2 <- lm(mean_FD_CingDors_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                           Shard_GA_at_scan + 
+                           AL_IMD_Neonatal + AL_HistoryAnyDummy , data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FD_CingDors_L1)
+```
+
+```{r}
+gvlma(fit_FD_CingDors_L2)
+```
+
+```{r}
+summary(fit_FD_CingDors_L1)
+```
+
+```{r}
+summary(fit_FD_CingDors_L2)
+```
+
+
+
+
+
+
+```{r}
+fit_FDC_CingDors_L1 <- lm(mean_FDC_CingDors_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                            Shard_GA_at_scan + 
+                            AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF, data=DATAFRAME)
+fit_FDC_CingDors_L2 <- lm(mean_FDC_CingDors_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                            Shard_GA_at_scan + 
+                            AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FDC_CingDors_L1)
+```
+
+```{r}
+gvlma(fit_FDC_CingDors_L2)
+```
+
+```{r}
+summary(fit_FDC_CingDors_L1)
+```
+
+```{r}
+summary(fit_FDC_CingDors_L2)
+```
+
+
+
+```{r}
+fit_LOGFC_CingDors_L1 <- lm(mean_LOGFC_CingDors_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                              Shard_GA_at_scan +
+                              AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF, data=DATAFRAME)
+fit_LOGFC_CingDors_L2 <- lm(mean_LOGFC_CingDors_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+
+                              Shard_GA_at_scan +
+                              AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_L1)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_L2)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_L1)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_L2)
+```
+
+
+
+
+
+CingDors_R
+
+```{r}
+fit_FD_CingDors_R1 <- lm(mean_FD_CingDors_R~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                           Shard_GA_at_scan + 
+                           AL_IMD_Neonatal + AL_HistoryAnyDummy , data=DATAFRAME)
+fit_FD_CingDors_R2 <- lm(mean_FD_CingDors_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                           Shard_GA_at_scan + 
+                           AL_IMD_Neonatal + AL_HistoryAnyDummy , data=DATAFRAME)
+```
+
+
+```{r}
+gvlma(fit_FD_CingDors_R1)
+```
+
+```{r}
+gvlma(fit_FD_CingDors_R2)
+```
+
+```{r}
+summary(fit_FD_CingDors_R1)
+```
+
+```{r}
+summary(fit_FD_CingDors_R2)
+```
+
+
+
+
+
+```{r}
+fit_FDC_CingDors_R1 <- lm(mean_FDC_CingDors_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+
+                            Shard_GA_at_scan + 
+                            AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF, data=DATAFRAME)
+fit_FDC_CingDors_R2 <- lm(mean_FDC_CingDors_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                            Shard_GA_at_scan + 
+                            AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FDC_CingDors_R1)
+```
+
+```{r}
+gvlma(fit_FDC_CingDors_R2)
+```
+
+
+```{r}
+summary(fit_FDC_CingDors_R1)
+```
+
+```{r}
+summary(fit_FDC_CingDors_R2)
+```
+
+
+
+
+
+
+```{r}
+fit_LOGFC_CingDors_R1 <- lm(mean_LOGFC_CingDors_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                              Shard_GA_at_scan +
+                              AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+fit_LOGFC_CingDors_R2 <- lm(mean_LOGFC_CingDors_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                              Shard_GA_at_scan +
+                              AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_R1)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_R2)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_R1)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_R2)
+```
+
+
+
+
+
+
+
+CingVent_L
+
+```{r}
+fit_FD_CingVent_L1 <- lm(mean_FD_CingVent_L~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                           Shard_GA_at_scan + 
+                           AL_IMD_Neonatal + AL_HistoryAnyDummy , data=DATAFRAME)
+fit_FD_CingVent_L2 <- lm(mean_FD_CingVent_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                           Shard_GA_at_scan + 
+                           AL_IMD_Neonatal + AL_HistoryAnyDummy , data=DATAFRAME)
+```
+
+
+```{r}
+gvlma(fit_FD_CingVent_L1)
+```
+
+```{r}
+gvlma(fit_FD_CingVent_L2)
+```
+
+```{r}
+summary(fit_FD_CingVent_L1)
+```
+
+```{r}
+summary(fit_FD_CingVent_L2)
+```
+
+
+
+
+
+```{r}
+fit_FDC_CingVent_L1 <- lm(mean_FDC_CingVent_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                            Shard_GA_at_scan + 
+                            AL_IMD_Neonatal +AL_HistoryAnyDummy + ICV_mm3_hasCSF, data=DATAFRAME)
+fit_FDC_CingVent_L2 <- lm(mean_FDC_CingVent_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                            Shard_GA_at_scan + 
+                            AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FDC_CingVent_L1)
+```
+
+```{r}
+gvlma(fit_FDC_CingVent_L2)
+```
+
+
+```{r}
+summary(fit_FDC_CingVent_L1)
+```
+
+```{r}
+summary(fit_FDC_CingVent_L2)
+```
+
+
+
+```{r}
+fit_LOGFC_CingVent_L1 <- lm(mean_LOGFC_CingVent_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                              Shard_GA_at_scan +
+                              AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+fit_LOGFC_CingVent_L2 <- lm(mean_LOGFC_CingVent_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+
+                              Shard_GA_at_scan +
+                              AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_L1)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_L2)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_L1)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_L2)
+```
+
+
+
+
+
+
+CingVent_R
+
+```{r}
+fit_FD_CingVent_R1 <- lm(mean_FD_CingVent_R~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                           Shard_GA_at_scan + 
+                           AL_IMD_Neonatal + AL_HistoryAnyDummy , data=DATAFRAME)
+fit_FD_CingVent_R2 <- lm(mean_FD_CingVent_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                           Shard_GA_at_scan + 
+                           AL_IMD_Neonatal + AL_HistoryAnyDummy , data=DATAFRAME)
+```
+
+
+```{r}
+gvlma(fit_FD_CingVent_R1)
+```
+
+```{r}
+gvlma(fit_FD_CingVent_R2)
+```
+
+```{r}
+summary(fit_FD_CingVent_R1)
+```
+
+```{r}
+summary(fit_FD_CingVent_R2)
+```
+
+
+As the model did not meet the assumption of heteroscedasticity, further checks were done: 
+
+Residuals vs fitted plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_FD_CingVent_R1, which=1)  
+```
+
+
+
+
+
+NCV test needs to be non-significant
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_FD_CingVent_R1) 
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_FD_CingVent_R1)
+```
+
+
+
+```{r}
+fit_FDC_CingVent_R1 <- lm(mean_FDC_CingVent_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                            Shard_GA_at_scan + 
+                            AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF, data=DATAFRAME)
+fit_FDC_CingVent_R2 <- lm(mean_FDC_CingVent_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                            Shard_GA_at_scan +
+                            AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FDC_CingVent_R1)
+```
+
+```{r}
+gvlma(fit_FDC_CingVent_R2)
+```
+
+
+```{r}
+summary(fit_FDC_CingVent_R1)
+```
+
+```{r}
+summary(fit_FDC_CingVent_R2)
+```
+
+
+
+
+
+
+```{r}
+fit_LOGFC_CingVent_R1 <- lm(mean_LOGFC_CingVent_R ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                              Shard_GA_at_birth+ Shard_GA_at_scan +
+                              AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+fit_LOGFC_CingVent_R2 <- lm(mean_LOGFC_CingVent_R ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                              Shard_GA_at_birth+ Shard_GA_at_scan +
+                              AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_R1)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_R2)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_R1)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_R2)
+```
+
+
+
+FDR correction of p values 
+```{r}
+PforFDR1 <- c(.003,.009,.183,.003,.022,.170,.099,.037,592,.160,.088,.607,
+              .218,.271,.750,.227,.362,.870)
+p.adjust(PforFDR1, method="fdr", n=length(PforFDR1))
+```
+
+
+
+
+
+
+
+INVESTIGATING THE ASSUMPTIONS FOR MULTIPLE REGRESSION in LOG(FC) MODELS
+
+Assumptions Log(FC) LEFT UNCINATE 
+
+Check residuals from model- median should be close to 0. If not, assumptions might be violated. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(fit_LOGFC_UF_L1)
+```
+
+Check anomalous data - Cook's distance (>1 outlier and high leverage)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_UF_L1, which=4)
+```
+
+Check normality of residuals 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+hist(x=residuals(fit_LOGFC_UF_L1), 
+     xlab="Value of residual",
+     main="") 
+```
+
+Check Shapiro-Wilk (not significant, normality assumption is met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+shapiro.test(residuals(fit_LOGFC_UF_L1)) 
+```
+
+Check linearity of relationship 
+plots residuals vs fitted (ideally, straight horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_UF_L1, which=1)  
+```
+
+Plot similar to above but for each individual predictor (Check p values, if significant, curvature is significant ( but use judgment)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+residualPlots(model=fit_LOGFC_UF_L1) 
+```
+
+Check normality assumptions - plot normal Q-Q (Check that follows the line - if yes, met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_UF_L1, which=2) 
+```
+
+Check homogeneity of variance 
+plots scale-location (Ideally straight, horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_UF_L1, which=3) 
+```
+
+Non-constant variance score (needs to be non-significant) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_LOGFC_UF_L1) 
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_LOGFC_UF_L1)
+```
+
+Check for collinearity (needs to be low - around 1)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+vif(mod=fit_LOGFC_UF_L1)
+```
+
+
+Added variable plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(car) 
+avPlots(fit_LOGFC_UF_L1, ask=FALSE)
+```
+
+
+
+
+
+
+Assumptions Log(FC) RIGHT UNCINATE 
+
+Check residuals from model- median should be close to 0. If not, assumptions might be violated. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(fit_LOGFC_UF_R1)
+```
+
+Check anomalous data - Cook's distance (>1 outlier and high leverage)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_UF_R1, which=4)
+```
+
+Check normality of residuals 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+hist(x=residuals(fit_LOGFC_UF_R1), 
+     xlab="Value of residual",
+     main="") 
+```
+
+Check Shapiro-Wilk (not significant, normality assumption is met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+shapiro.test(residuals(fit_LOGFC_UF_R1)) 
+```
+
+Check linearity of relationship 
+plots residuals vs fitted (ideally, straight horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_UF_R1, which=1)  
+```
+
+Plot similar to above but for each individual predictor (Check p values, if significant, curvature is significant ( but use judgment)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+residualPlots(model=fit_LOGFC_UF_R1) 
+```
+
+Check normality assumptions - plot normal Q-Q (Check that follows the line - if yes, met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_UF_R1, which=2) 
+```
+
+Check homogeneity of variance 
+plots scale-location (Ideally straight, horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_UF_R1, which=3) 
+```
+
+Non-constant variance score (needs to be non-significant) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_LOGFC_UF_R1) 
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_LOGFC_UF_R1)
+```
+
+Check for collinearity (needs to be low - around 1)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+vif(mod=fit_LOGFC_UF_R1)
+```
+
+
+Added variable plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(car) 
+avPlots(fit_LOGFC_UF_R1, ask=FALSE)
+```
+
+
+
+
+
+
+
+Assumptions Log(FC) LEFT UNCINATE 
+
+Check residuals from model- median should be close to 0. If not, assumptions might be violated. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(fit_LOGFC_CingDors_L1)
+```
+
+Check anomalous data - Cook's distance (>1 outlier and high leverage)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingDors_L1, which=4)
+```
+
+Check normality of residuals 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+hist(x=residuals(fit_LOGFC_CingDors_L1), 
+     xlab="Value of residual",
+     main="") 
+```
+
+Check Shapiro-Wilk (not significant, normality assumption is met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+shapiro.test(residuals(fit_LOGFC_CingDors_L1)) 
+```
+
+Check linearity of relationship 
+plots residuals vs fitted (ideally, straight horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingDors_L1, which=1)  
+```
+
+Plot similar to above but for each individual predictor (Check p values, if significant, curvature is significant ( but use judgment)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+residualPlots(model=fit_LOGFC_CingDors_L1) 
+```
+
+Check normality assumptions - plot normal Q-Q (Check that follows the line - if yes, met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingDors_L1, which=2) 
+```
+
+Check homogeneity of variance 
+plots scale-location (Ideally straight, horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingDors_L1, which=3) 
+```
+
+Non-constant variance score (needs to be non-significant) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_LOGFC_CingDors_L1) 
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_LOGFC_CingDors_L1)
+```
+
+Check for collinearity (needs to be low - around 1)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+vif(mod=fit_LOGFC_CingDors_L1)
+```
+
+
+
+Added variable plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(car) 
+avPlots(fit_LOGFC_CingDors_L1, ask=FALSE)
+```
+
+
+
+
+
+Assumptions Log(FC) RIGHT DORSAL CINGULUM
+
+Check residuals from model- median should be close to 0. If not, assumptions might be violated. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(fit_LOGFC_CingDors_R1)
+```
+
+Check anomalous data - Cook's distance (>1 outlier and high leverage)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingDors_R1, which=4)
+```
+
+Check normality of residuals 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+hist(x=residuals(fit_LOGFC_CingDors_R1), 
+     xlab="Value of residual",
+     main="") 
+```
+
+Check Shapiro-Wilk (not significant, normality assumption is met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+shapiro.test(residuals(fit_LOGFC_CingDors_R1)) 
+```
+
+Check linearity of relationship 
+plots residuals vs fitted (ideally, straight horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingDors_R1, which=1)  
+```
+
+Plot similar to above but for each individual predictor (Check p values, if significant, curvature is significant ( but use judgment)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+residualPlots(model=fit_LOGFC_CingDors_R1) 
+```
+
+Check normality assumptions - plot normal Q-Q (Check that follows the line - if yes, met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingDors_R1, which=2) 
+```
+
+Check homogeneity of variance 
+plots scale-location (Ideally straight, horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingDors_R1, which=3) 
+```
+
+Non-constant variance score (needs to be non-significant) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_LOGFC_CingDors_R1) 
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_LOGFC_CingDors_R1)
+```
+
+Check for collinearity (needs to be low - around 1)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+vif(mod=fit_LOGFC_CingDors_R1)
+```
+
+
+
+Added variable plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(car) 
+avPlots(fit_LOGFC_CingDors_R1, ask=FALSE)
+```
+
+
+
+
+
+
+Assumptions Log(FC) LEFT UNCINATE 
+
+Check residuals from model- median should be close to 0. If not, assumptions might be violated. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(fit_LOGFC_CingVent_L1)
+```
+
+Check anomalous data - Cook's distance (>1 outlier and high leverage)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingVent_L1, which=4)
+```
+
+Check normality of residuals 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+hist(x=residuals(fit_LOGFC_CingVent_L1), 
+     xlab="Value of residual",
+     main="") 
+```
+
+Check Shapiro-Wilk (not significant, normality assumption is met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+shapiro.test(residuals(fit_LOGFC_CingVent_L1)) 
+```
+
+Check linearity of relationship 
+plots residuals vs fitted (ideally, straight horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingVent_L1, which=1)  
+```
+
+Plot similar to above but for each individual predictor (Check p values, if significant, curvature is significant ( but use judgment)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+residualPlots(model=fit_LOGFC_CingVent_L1) 
+```
+
+Check normality assumptions - plot normal Q-Q (Check that follows the line - if yes, met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingVent_L1, which=2) 
+```
+
+Check homogeneity of variance 
+plots scale-location (Ideally straight, horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingVent_L1, which=3) 
+```
+
+Non-constant variance score (needs to be non-significant) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_LOGFC_CingVent_L1) 
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_LOGFC_CingVent_L1)
+```
+
+Check for collinearity (needs to be low - around 1)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+vif(mod=fit_LOGFC_CingVent_L1)
+```
+
+Added variable plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(car) 
+avPlots(fit_LOGFC_CingVent_L1, ask=FALSE)
+```
+
+
+
+
+
+Assumptions Log(FC) RIGHT VENTRAL CINGULUM
+
+Check residuals from model- median should be close to 0. If not, assumptions might be violated. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(fit_LOGFC_CingVent_R1)
+```
+
+Check anomalous data - Cook's distance (>1 outlier and high leverage)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingVent_R1, which=4)
+```
+
+Check normality of residuals 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+hist(x=residuals(fit_LOGFC_CingVent_R1), 
+     xlab="Value of residual",
+     main="") 
+```
+
+Check Shapiro-Wilk (not significant, normality assumption is met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+shapiro.test(residuals(fit_LOGFC_CingVent_R1)) 
+```
+
+Check linearity of relationship 
+plots residuals vs fitted (ideally, straight horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingVent_R1, which=1)  
+```
+
+Plot similar to above but for each individual predictor (Check p values, if significant, curvature is significant ( but use judgment)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+residualPlots(model=fit_LOGFC_CingVent_R1) 
+```
+
+Check normality assumptions - plot normal Q-Q (Check that follows the line - if yes, met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingVent_R1, which=2) 
+```
+
+Check homogeneity of variance 
+plots scale-location (Ideally straight, horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_LOGFC_CingVent_R1, which=3) 
+```
+
+Non-constant variance score (needs to be non-significant) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_LOGFC_CingVent_R1) 
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_LOGFC_CingVent_R1)
+```
+
+Check for collinearity (needs to be low - around 1)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+vif(mod=fit_LOGFC_CingVent_R1)
+```
+
+
+
+Added variable plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(car) 
+avPlots(fit_LOGFC_CingVent_R1, ask=FALSE)
+```
+
+
+
+REPEATING LOG(FC) MODELS WITHOUT ICV AS A COVARIATE
+
+
+```{r}
+fit_LOGFC_UF_L1a <- lm(mean_LOGFC_UF_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                         Shard_GA_at_scan + 
+                         AL_IMD_Neonatal + AL_HistoryAnyDummy, data=DATAFRAME)
+fit_LOGFC_UF_L2a <- lm(mean_LOGFC_UF_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                         Shard_GA_at_scan + 
+                         AL_IMD_Neonatal + AL_HistoryAnyDummy, data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_L1a)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_L2a)
+```
+
+```{r}
+summary(fit_LOGFC_UF_L1a)
+```
+
+```{r}
+summary(fit_LOGFC_UF_L2a)
+```
+
+
+```{r}
+fit_LOGFC_UF_R1a <- lm(mean_LOGFC_UF_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                         Shard_GA_at_scan + 
+                         AL_IMD_Neonatal + AL_HistoryAnyDummy, data=DATAFRAME)
+fit_LOGFC_UF_R2a <- lm(mean_LOGFC_UF_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                         Shard_GA_at_scan + 
+                         AL_IMD_Neonatal + AL_HistoryAnyDummy, data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_R1a)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_R2a)
+```
+
+```{r}
+summary(fit_LOGFC_UF_R1a)
+```
+
+```{r}
+summary(fit_LOGFC_UF_R2a)
+```
+
+
+```{r}
+fit_LOGFC_CingDors_L1a <- lm(mean_LOGFC_CingDors_L ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                               Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy,
+                             data=DATAFRAME)
+fit_LOGFC_CingDors_L2a <- lm(mean_LOGFC_CingDors_L ~ AL_EPDS_HIGHEST*Shard_Sex +
+                               Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy, 
+                             data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_L1a)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_L2a)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_L1a)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_L2a)
+```
+
+
+```{r}
+fit_LOGFC_CingDors_R1a <- lm(mean_LOGFC_CingDors_R ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                               Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy,
+                             data=DATAFRAME)
+fit_LOGFC_CingDors_R2a <- lm(mean_LOGFC_CingDors_R ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                               Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy,
+                             data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_R1a)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_R2a)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_R1a)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_R2a)
+```
+
+
+
+```{r}
+fit_LOGFC_CingVent_L1a <- lm(mean_LOGFC_CingVent_L ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                               Shard_GA_at_birth+
+                               Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy, 
+                             data=DATAFRAME)
+fit_LOGFC_CingVent_L2a <- lm(mean_LOGFC_CingVent_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                               Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy, 
+                             data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_L1a)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_L2a)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_L1a)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_L2a)
+```
+
+
+```{r}
+fit_LOGFC_CingVent_R1a <- lm(mean_LOGFC_CingVent_R ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                               Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy, 
+                             data=DATAFRAME)
+fit_LOGFC_CingVent_R2a <- lm(mean_LOGFC_CingVent_R ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                               Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy, 
+                             data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_R1a)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_R2a)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_R1a)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_R2a)
+```
+
+
+
+
+
+
+SENSITIVITY ANALYSIS - REPEATING MODELS BUT EXCLUDING SSRI 
+
+```{r}
+Hmisc::describe(DATAFRAME$PsychMeds_Details)
+```
+
+Subsetting 
+
+```{r}
+SSRI <- subset(DATAFRAME, PsychMeds_YesNo == "Yes")
+psych::describe(SSRI$AL_EPDS_HIGHEST)
+```
+
+```{r}
+NOSSRI <- subset(DATAFRAME, PsychMeds_YesNo == "No")
+```
+
+Ran this in console: 
+str(NOSSRI)
+
+```{r}
+fit_FD_UF_L1_NOSSRI <- lm(mean_FD_UF_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                            Shard_GA_at_scan + 
+                            AL_IMD_Neonatal + AL_HistoryAnyDummy, data=NOSSRI)
+fit_FD_UF_L2_NOSSRI <- lm(mean_FD_UF_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                            Shard_GA_at_scan + 
+                            AL_IMD_Neonatal + AL_HistoryAnyDummy, data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_FD_UF_L1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_FD_UF_L2_NOSSRI)
+```
+
+```{r}
+summary(fit_FD_UF_L1_NOSSRI)
+```
+
+```{r}
+summary(fit_FD_UF_L2_NOSSRI)
+```
+
+
+
+
+
+```{r}
+fit_FDC_UF_L1_NOSSRI <- lm(mean_FDC_UF_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                             Shard_GA_at_scan + 
+                             AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF ,
+                           data=NOSSRI)
+fit_FDC_UF_L2_NOSSRI <- lm(mean_FDC_UF_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                             Shard_GA_at_scan + 
+                             AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , 
+                           data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_FDC_UF_L1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_FDC_UF_L2_NOSSRI)
+```
+
+```{r}
+summary(fit_FDC_UF_L1_NOSSRI)
+```
+
+```{r}
+summary(fit_FDC_UF_L2_NOSSRI)
+```
+
+
+```{r}
+fit_LOGFC_UF_L1_NOSSRI <- lm(mean_LOGFC_UF_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + 
+                               AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF, 
+                             data=NOSSRI)
+fit_LOGFC_UF_L2_NOSSRI <- lm(mean_LOGFC_UF_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + 
+                               AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF ,
+                             data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_L1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_L2_NOSSRI)
+```
+
+```{r}
+summary(fit_LOGFC_UF_L1_NOSSRI)
+```
+
+```{r}
+summary(fit_LOGFC_UF_L2_NOSSRI)
+```
+
+UF_R
+
+```{r}
+fit_FD_UF_R1_NOSSRI <- lm(mean_FD_UF_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+
+                            Shard_GA_at_scan + 
+                            AL_IMD_Neonatal + AL_HistoryAnyDummy , data=NOSSRI)
+fit_FD_UF_R2_NOSSRI <- lm(mean_FD_UF_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                            Shard_GA_at_scan + 
+                            AL_IMD_Neonatal + AL_HistoryAnyDummy , data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_FD_UF_R1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_FD_UF_R2_NOSSRI)
+```
+
+```{r}
+summary(fit_FD_UF_R1_NOSSRI)
+```
+
+```{r}
+summary(fit_FD_UF_R2_NOSSRI)
+```
+
+
+
+```{r}
+fit_FDC_UF_R1_NOSSRI <- lm(mean_FDC_UF_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                             Shard_GA_at_scan + 
+                             AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF, 
+                           data=NOSSRI)
+fit_FDC_UF_R2_NOSSRI <- lm(mean_FDC_UF_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                             Shard_GA_at_scan + 
+                             AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , 
+                           data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_FDC_UF_R1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_FDC_UF_R2_NOSSRI)
+```
+
+```{r}
+summary(fit_FDC_UF_R1_NOSSRI)
+```
+
+```{r}
+summary(fit_FDC_UF_R2_NOSSRI)
+```
+
+
+```{r}
+fit_LOGFC_UF_R1_NOSSRI <- lm(mean_LOGFC_UF_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                               Shard_GA_at_scan +
+                               AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF, 
+                             data=NOSSRI)
+fit_LOGFC_UF_R2_NOSSRI <- lm(mean_LOGFC_UF_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + 
+                               AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF, 
+                             data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_R1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_R2_NOSSRI)
+```
+
+```{r}
+summary(fit_LOGFC_UF_R1_NOSSRI)
+```
+
+```{r}
+summary(fit_LOGFC_UF_R2_NOSSRI)
+```
+
+
+
+
+CingDors_L
+
+```{r}
+fit_FD_CingDors_L1_NOSSRI <- lm(mean_FD_CingDors_L~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                                  Shard_GA_at_scan +
+                                  AL_IMD_Neonatal + AL_HistoryAnyDummy , data=NOSSRI)
+fit_FD_CingDors_L2_NOSSRI <- lm(mean_FD_CingDors_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                                  Shard_GA_at_scan +
+                                  AL_IMD_Neonatal + AL_HistoryAnyDummy , data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_FD_CingDors_L1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_FD_CingDors_L2_NOSSRI)
+```
+
+```{r}
+summary(fit_FD_CingDors_L1_NOSSRI)
+```
+
+```{r}
+summary(fit_FD_CingDors_L2_NOSSRI)
+```
+
+
+
+```{r}
+fit_FDC_CingDors_L1_NOSSRI <- lm(mean_FDC_CingDors_L ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                   Shard_GA_at_birth+ 
+                                   Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                   ICV_mm3_hasCSF, 
+                                 data=NOSSRI)
+fit_FDC_CingDors_L2_NOSSRI <- lm(mean_FDC_CingDors_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                   Shard_GA_at_birth+ 
+                                   Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                   ICV_mm3_hasCSF , 
+                                 data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_FDC_CingDors_L1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_FDC_CingDors_L2_NOSSRI)
+```
+
+```{r}
+summary(fit_FDC_CingDors_L1_NOSSRI)
+```
+
+```{r}
+summary(fit_FDC_CingDors_L2_NOSSRI)
+```
+
+
+```{r}
+fit_LOGFC_CingDors_L1_NOSSRI <- lm(mean_LOGFC_CingDors_L ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                     Shard_GA_at_birth+ 
+                                     Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                     ICV_mm3_hasCSF, 
+                                   data=NOSSRI)
+fit_LOGFC_CingDors_L2_NOSSRI <- lm(mean_LOGFC_CingDors_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                     Shard_GA_at_birth+ 
+                                     Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                     ICV_mm3_hasCSF , 
+                                   data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_L1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_L2_NOSSRI)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_L1_NOSSRI)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_L2_NOSSRI)
+```
+
+
+
+CingDors_R
+
+```{r}
+fit_FD_CingDors_R1_NOSSRI <- lm(mean_FD_CingDors_R~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                  Shard_GA_at_birth+ 
+                                  Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy ,
+                                data=NOSSRI)
+fit_FD_CingDors_R2_NOSSRI <- lm(mean_FD_CingDors_R~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                  Shard_GA_at_birth+ 
+                                  Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy , 
+                                data=NOSSRI)
+```
+
+
+```{r}
+gvlma(fit_FD_CingDors_R1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_FD_CingDors_R2_NOSSRI)
+```
+
+```{r}
+summary(fit_FD_CingDors_R1_NOSSRI)
+```
+
+```{r}
+summary(fit_FD_CingDors_R2_NOSSRI)
+```
+
+
+
+```{r}
+fit_FDC_CingDors_R1_NOSSRI <- lm(mean_FDC_CingDors_R ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                   Shard_GA_at_birth+ 
+                                   Shard_GA_at_scan + AL_IMD_Neonatal +AL_HistoryAnyDummy + 
+                                   ICV_mm3_hasCSF, 
+                                 data=NOSSRI)
+fit_FDC_CingDors_R2_NOSSRI<- lm(mean_FDC_CingDors_R ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                  Shard_GA_at_birth+ 
+                                  Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                  ICV_mm3_hasCSF , 
+                                data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_FDC_CingDors_R1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_FDC_CingDors_R2_NOSSRI)
+```
+
+
+```{r}
+summary(fit_FDC_CingDors_R1_NOSSRI)
+```
+
+```{r}
+summary(fit_FDC_CingDors_R2_NOSSRI)
+```
+
+
+
+
+```{r}
+fit_LOGFC_CingDors_R1_NOSSRI <- lm(mean_LOGFC_CingDors_R ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                     Shard_GA_at_birth+ 
+                                     Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                     ICV_mm3_hasCSF , 
+                                   data=NOSSRI)
+fit_LOGFC_CingDors_R2_NOSSRI <- lm(mean_LOGFC_CingDors_R ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                     Shard_GA_at_birth+ 
+                                     Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                     ICV_mm3_hasCSF ,
+                                   data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_R1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_R2_NOSSRI)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_R1_NOSSRI)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_R2_NOSSRI)
+```
+
+
+
+
+
+CingVent_L
+
+```{r}
+fit_FD_CingVent_L1_NOSSRI <- lm(mean_FD_CingVent_L~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                                  Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy , 
+                                data=NOSSRI)
+fit_FD_CingVent_L2_NOSSRI <- lm(mean_FD_CingVent_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                                  Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy , 
+                                data=NOSSRI)
+```
+
+
+```{r}
+gvlma(fit_FD_CingVent_L1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_FD_CingVent_L2_NOSSRI)
+```
+
+```{r}
+summary(fit_FD_CingVent_L1_NOSSRI)
+```
+
+```{r}
+summary(fit_FD_CingVent_L2_NOSSRI)
+```
+
+
+
+
+
+```{r}
+fit_FDC_CingVent_L1_NOSSRI <- lm(mean_FDC_CingVent_L ~ AL_EPDS_HIGHEST+Shard_Sex +
+                                   Shard_GA_at_birth+ 
+                                   Shard_GA_at_scan + AL_IMD_Neonatal +AL_HistoryAnyDummy + 
+                                   ICV_mm3_hasCSF, 
+                                 data=NOSSRI)
+fit_FDC_CingVent_L2_NOSSRI <- lm(mean_FDC_CingVent_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                   Shard_GA_at_birth+ 
+                                   Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                   ICV_mm3_hasCSF ,
+                                 data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_FDC_CingVent_L1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_FDC_CingVent_L2_NOSSRI)
+```
+
+
+```{r}
+summary(fit_FDC_CingVent_L1_NOSSRI)
+```
+
+```{r}
+summary(fit_FDC_CingVent_L2_NOSSRI)
+```
+
+
+
+```{r}
+fit_LOGFC_CingVent_L1_NOSSRI <- lm(mean_LOGFC_CingVent_L ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                     Shard_GA_at_birth+ 
+                                     Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                     ICV_mm3_hasCSF , 
+                                   data=NOSSRI)
+fit_LOGFC_CingVent_L2_NOSSRI <- lm(mean_LOGFC_CingVent_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                     Shard_GA_at_birth+ 
+                                     Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                     ICV_mm3_hasCSF , 
+                                   data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_L1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_L2_NOSSRI)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_L1_NOSSRI)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_L2_NOSSRI)
+```
+
+
+
+
+CingVent_R
+
+```{r}
+fit_FD_CingVent_R1_NOSSRI <- lm(mean_FD_CingVent_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                                  Shard_GA_at_scan +
+                                  AL_IMD_Neonatal + AL_HistoryAnyDummy , data=NOSSRI)
+fit_FD_CingVent_R2_NOSSRI <- lm(mean_FD_CingVent_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                                  Shard_GA_at_scan +
+                                  AL_IMD_Neonatal + AL_HistoryAnyDummy , data=NOSSRI)
+```
+
+
+```{r}
+gvlma(fit_FD_CingVent_R1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_FD_CingVent_R2_NOSSRI)
+```
+
+```{r}
+summary(fit_FD_CingVent_R1_NOSSRI)
+```
+
+```{r}
+summary(fit_FD_CingVent_R2_NOSSRI)
+```
+
+
+
+
+
+
+```{r}
+fit_FDC_CingVent_R1_NOSSRI <- lm(mean_FDC_CingVent_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                                   Shard_GA_at_scan +
+                                   AL_IMD_Neonatal +AL_HistoryAnyDummy + ICV_mm3_hasCSF, data=NOSSRI)
+fit_FDC_CingVent_R2_NOSSRI <- lm(mean_FDC_CingVent_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+
+                                   Shard_GA_at_scan +
+                                   AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_FDC_CingVent_R1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_FDC_CingVent_R2_NOSSRI)
+```
+
+
+```{r}
+summary(fit_FDC_CingVent_R1_NOSSRI)
+```
+
+```{r}
+summary(fit_FDC_CingVent_R2_NOSSRI)
+```
+
+
+
+```{r}
+fit_LOGFC_CingVent_R1_NOSSRI <- lm(mean_LOGFC_CingVent_R ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                     Shard_GA_at_birth+ 
+                                     Shard_GA_at_scan +
+                                     AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF , 
+                                   data=NOSSRI)
+fit_LOGFC_CingVent_R2_NOSSRI <- lm(mean_LOGFC_CingVent_R ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                     Shard_GA_at_birth+ 
+                                     Shard_GA_at_scan +
+                                     AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF ,
+                                   data=NOSSRI)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_R1_NOSSRI)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_R2_NOSSRI)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_R1_NOSSRI)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_R2_NOSSRI)
+```
+
+
+FDR correction of p values 
+```{r}
+PforFDR1_NOSSRI <- c(.003,.019,.163,.003,.025,.152,.140,.044,.639,.254,.079,
+                     .447,228,.188,.929,.258,.247,.892)
+p.adjust(PforFDR1_NOSSRI, method="fdr", n=length(PforFDR1_NOSSRI))
+```
+
+
+
+
+
+Subsetting 
+
+```{r}
+NOEPDS20PLUS <- subset(DATAFRAME, AL_EPDS_HIGHEST < 20 )
+```
+
+```{r}
+EPDS20PLUS <- subset(DATAFRAME, AL_EPDS_HIGHEST > 19 )
+EPDS20PLUS$AL_EPDS_HIGHEST
+```
+
+```{r}
+fit_FD_UF_L1_NOEPDS20PLUS <- lm(mean_FD_UF_L ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                  Shard_GA_at_birth+ Shard_GA_at_scan + 
+                                  AL_IMD_Neonatal + AL_HistoryAnyDummy, data=NOEPDS20PLUS)
+fit_FD_UF_L2_NOEPDS20PLUS <- lm(mean_FD_UF_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                  Shard_GA_at_birth+ Shard_GA_at_scan + 
+                                  AL_IMD_Neonatal + AL_HistoryAnyDummy, data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FD_UF_L1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FD_UF_L2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FD_UF_L1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FD_UF_L2_NOEPDS20PLUS)
+```
+
+
+
+
+
+```{r}
+fit_FDC_UF_L1_NOEPDS20PLUS <- lm(mean_FDC_UF_L ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                   Shard_GA_at_birth+ Shard_GA_at_scan +
+                                   AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF ,
+                                 data=NOEPDS20PLUS)
+fit_FDC_UF_L2_NOEPDS20PLUS <- lm(mean_FDC_UF_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                                   Shard_GA_at_scan +
+                                   AL_IMD_Neonatal + AL_HistoryAnyDummy + ICV_mm3_hasCSF ,
+                                 data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FDC_UF_L1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FDC_UF_L2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FDC_UF_L1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FDC_UF_L2_NOEPDS20PLUS)
+```
+
+
+```{r}
+fit_LOGFC_UF_L1_NOEPDS20PLUS <- lm(mean_LOGFC_UF_L ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                     Shard_GA_at_birth+ Shard_GA_at_scan + AL_IMD_Neonatal + 
+                                     AL_HistoryAnyDummy + ICV_mm3_hasCSF, data=NOEPDS20PLUS)
+fit_LOGFC_UF_L2_NOEPDS20PLUS <- lm(mean_LOGFC_UF_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                     Shard_GA_at_birth+ Shard_GA_at_scan + AL_IMD_Neonatal +
+                                     AL_HistoryAnyDummy + ICV_mm3_hasCSF , data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_L1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_L2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_LOGFC_UF_L1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_LOGFC_UF_L2_NOEPDS20PLUS)
+```
+
+UF_R
+
+```{r}
+fit_FD_UF_R1_NOEPDS20PLUS <- lm(mean_FD_UF_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                                  Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy , 
+                                data=NOEPDS20PLUS)
+fit_FD_UF_R2_NOEPDS20PLUS <- lm(mean_FD_UF_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                                  Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy , 
+                                data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FD_UF_R1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FD_UF_R2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FD_UF_R1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FD_UF_R2_NOEPDS20PLUS)
+```
+
+
+
+```{r}
+fit_FDC_UF_R1_NOEPDS20PLUS <- lm(mean_FDC_UF_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                                   Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy +
+                                   ICV_mm3_hasCSF, 
+                                 data=NOEPDS20PLUS)
+fit_FDC_UF_R2_NOEPDS20PLUS <- lm(mean_FDC_UF_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                                   Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                   ICV_mm3_hasCSF , 
+                                 data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FDC_UF_R1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FDC_UF_R2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FDC_UF_R1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FDC_UF_R2_NOEPDS20PLUS)
+```
+
+
+```{r}
+fit_LOGFC_UF_R1_NOEPDS20PLUS <- lm(mean_LOGFC_UF_R ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                     Shard_GA_at_birth+ 
+                                     Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                     ICV_mm3_hasCSF, 
+                                   data=NOEPDS20PLUS)
+fit_LOGFC_UF_R2_NOEPDS20PLUS <- lm(mean_LOGFC_UF_R ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                     Shard_GA_at_birth+
+                                     Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                     ICV_mm3_hasCSF, 
+                                   data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_R1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_LOGFC_UF_R2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_LOGFC_UF_R1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_LOGFC_UF_R2_NOEPDS20PLUS)
+```
+
+
+
+
+CingDors_L
+
+```{r}
+fit_FD_CingDors_L1_NOEPDS20PLUS <- lm(mean_FD_CingDors_L~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                        Shard_GA_at_birth+ 
+                                        Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy ,
+                                      data=NOEPDS20PLUS)
+fit_FD_CingDors_L2_NOEPDS20PLUS <- lm(mean_FD_CingDors_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                        Shard_GA_at_birth+ 
+                                        Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy , 
+                                      data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FD_CingDors_L1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FD_CingDors_L2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FD_CingDors_L1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FD_CingDors_L2_NOEPDS20PLUS)
+```
+
+
+
+```{r}
+fit_FDC_CingDors_L1_NOEPDS20PLUS <- lm(mean_FDC_CingDors_L ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                         Shard_GA_at_birth+
+                                         Shard_GA_at_scan + AL_IMD_Neonatal +
+                                         AL_HistoryAnyDummy + 
+                                         ICV_mm3_hasCSF,
+                                       data=NOEPDS20PLUS)
+fit_FDC_CingDors_L2_NOEPDS20PLUS <- lm(mean_FDC_CingDors_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                         Shard_GA_at_birth+ 
+                                         Shard_GA_at_scan + AL_IMD_Neonatal + 
+                                         AL_HistoryAnyDummy + 
+                                         ICV_mm3_hasCSF ,
+                                       data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FDC_CingDors_L1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FDC_CingDors_L2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FDC_CingDors_L1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FDC_CingDors_L2_NOEPDS20PLUS)
+```
+
+
+```{r}
+fit_LOGFC_CingDors_L1_NOEPDS20PLUS <- lm(mean_LOGFC_CingDors_L ~ AL_EPDS_HIGHEST+Shard_Sex +
+                                           Shard_GA_at_birth+ 
+                                           Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                           ICV_mm3_hasCSF,
+                                         data=NOEPDS20PLUS)
+fit_LOGFC_CingDors_L2_NOEPDS20PLUS <- lm(mean_LOGFC_CingDors_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                           Shard_GA_at_birth+ 
+                                           Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                           ICV_mm3_hasCSF ,
+                                         data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_L1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_L2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_L1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_L2_NOEPDS20PLUS)
+```
+
+
+
+CingDors_R
+
+```{r}
+fit_FD_CingDors_R1_NOEPDS20PLUS <- lm(mean_FD_CingDors_R~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                        Shard_GA_at_birth+ 
+                                        Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy , 
+                                      data=NOEPDS20PLUS)
+fit_FD_CingDors_R2_NOEPDS20PLUS <- lm(mean_FD_CingDors_R~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                        Shard_GA_at_birth+ 
+                                        Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy ,
+                                      data=NOEPDS20PLUS)
+```
+
+
+```{r}
+gvlma(fit_FD_CingDors_R1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FD_CingDors_R2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FD_CingDors_R1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FD_CingDors_R2_NOEPDS20PLUS)
+```
+
+
+
+```{r}
+fit_FDC_CingDors_R1_NOEPDS20PLUS <- lm(mean_FDC_CingDors_R ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                         Shard_GA_at_birth+ Shard_GA_at_scan + AL_IMD_Neonatal +
+                                         AL_HistoryAnyDummy +
+                                         ICV_mm3_hasCSF, data=NOEPDS20PLUS)
+fit_FDC_CingDors_R2_NOEPDS20PLUS<- lm(mean_FDC_CingDors_R ~ AL_EPDS_HIGHEST*Shard_Sex +
+                                        Shard_GA_at_birth+ Shard_GA_at_scan + AL_IMD_Neonatal + 
+                                        AL_HistoryAnyDummy +
+                                        ICV_mm3_hasCSF , data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FDC_CingDors_R1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FDC_CingDors_R2_NOEPDS20PLUS)
+```
+
+
+```{r}
+summary(fit_FDC_CingDors_R1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FDC_CingDors_R2_NOEPDS20PLUS)
+```
+
+
+
+
+```{r}
+fit_LOGFC_CingDors_R1_NOEPDS20PLUS <- lm(mean_LOGFC_CingDors_R ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                           Shard_GA_at_birth+ Shard_GA_at_scan + AL_IMD_Neonatal + 
+                                           AL_HistoryAnyDummy +
+                                           ICV_mm3_hasCSF , data=NOEPDS20PLUS)
+fit_LOGFC_CingDors_R2_NOEPDS20PLUS <- lm(mean_LOGFC_CingDors_R ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                           Shard_GA_at_birth+ Shard_GA_at_scan + AL_IMD_Neonatal + 
+                                           AL_HistoryAnyDummy +
+                                           ICV_mm3_hasCSF , data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_R1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingDors_R2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_R1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_LOGFC_CingDors_R2_NOEPDS20PLUS)
+```
+
+
+
+
+
+CingVent_L
+
+```{r}
+fit_FD_CingVent_L1_NOEPDS20PLUS <- lm(mean_FD_CingVent_L~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                        Shard_GA_at_birth+ Shard_GA_at_scan + AL_IMD_Neonatal + 
+                                        AL_HistoryAnyDummy ,
+                                      data=NOEPDS20PLUS)
+fit_FD_CingVent_L2_NOEPDS20PLUS <- lm(mean_FD_CingVent_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                        Shard_GA_at_birth+ Shard_GA_at_scan + AL_IMD_Neonatal + 
+                                        AL_HistoryAnyDummy ,
+                                      data=NOEPDS20PLUS)
+```
+
+
+```{r}
+gvlma(fit_FD_CingVent_L1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FD_CingVent_L2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FD_CingVent_L1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FD_CingVent_L2_NOEPDS20PLUS)
+```
+
+
+
+
+
+```{r}
+fit_FDC_CingVent_L1_NOEPDS20PLUS <- lm(mean_FDC_CingVent_L ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                         Shard_GA_at_birth+ 
+                                         Shard_GA_at_scan + AL_IMD_Neonatal +AL_HistoryAnyDummy + 
+                                         ICV_mm3_hasCSF,
+                                       data=NOEPDS20PLUS)
+fit_FDC_CingVent_L2_NOEPDS20PLUS <- lm(mean_FDC_CingVent_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                         Shard_GA_at_birth+ 
+                                         Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                         ICV_mm3_hasCSF ,
+                                       data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FDC_CingVent_L1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FDC_CingVent_L2_NOEPDS20PLUS)
+```
+
+
+```{r}
+summary(fit_FDC_CingVent_L1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FDC_CingVent_L2_NOEPDS20PLUS)
+```
+
+
+
+```{r}
+fit_LOGFC_CingVent_L1_NOEPDS20PLUS <- lm(mean_LOGFC_CingVent_L ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                           Shard_GA_at_birth+ Shard_GA_at_scan + AL_IMD_Neonatal + 
+                                           AL_HistoryAnyDummy +
+                                           ICV_mm3_hasCSF , data=NOEPDS20PLUS)
+fit_LOGFC_CingVent_L2_NOEPDS20PLUS <- lm(mean_LOGFC_CingVent_L ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                           Shard_GA_at_birth+ Shard_GA_at_scan + AL_IMD_Neonatal + 
+                                           AL_HistoryAnyDummy +
+                                           ICV_mm3_hasCSF , data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_L1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_L2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_L1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_L2_NOEPDS20PLUS)
+```
+
+
+
+
+CingVent_R
+
+```{r}
+fit_FD_CingVent_R1_NOEPDS20PLUS <- lm(mean_FD_CingVent_R ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                        Shard_GA_at_birth+ 
+                                        Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy ,
+                                      data=NOEPDS20PLUS)
+fit_FD_CingVent_R2_NOEPDS20PLUS <- lm(mean_FD_CingVent_R ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                        Shard_GA_at_birth+ 
+                                        Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy , 
+                                      data=NOEPDS20PLUS)
+```
+
+
+```{r}
+gvlma(fit_FD_CingVent_R1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FD_CingVent_R2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FD_CingVent_R1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FD_CingVent_R2_NOEPDS20PLUS)
+```
+
+
+
+```{r}
+fit_FDC_CingVent_R1_NOEPDS20PLUS <- lm(mean_FDC_CingVent_R ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                         Shard_GA_at_birth+ 
+                                         Shard_GA_at_scan + AL_IMD_Neonatal +AL_HistoryAnyDummy + 
+                                         ICV_mm3_hasCSF,
+                                       data=NOEPDS20PLUS)
+fit_FDC_CingVent_R2_NOEPDS20PLUS <- lm(mean_FDC_CingVent_R ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                         Shard_GA_at_birth+ 
+                                         Shard_GA_at_scan + AL_IMD_Neonatal + AL_HistoryAnyDummy + 
+                                         ICV_mm3_hasCSF ,
+                                       data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FDC_CingVent_R1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_FDC_CingVent_R2_NOEPDS20PLUS)
+```
+
+
+```{r}
+summary(fit_FDC_CingVent_R1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_FDC_CingVent_R2_NOEPDS20PLUS)
+```
+
+
+
+```{r}
+fit_LOGFC_CingVent_R1_NOEPDS20PLUS <- lm(mean_LOGFC_CingVent_R ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                           Shard_GA_at_birth+ Shard_GA_at_scan + AL_IMD_Neonatal + 
+                                           AL_HistoryAnyDummy +
+                                           ICV_mm3_hasCSF , data=NOEPDS20PLUS)
+fit_LOGFC_CingVent_R2_NOEPDS20PLUS <- lm(mean_LOGFC_CingVent_R ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                           Shard_GA_at_birth+ Shard_GA_at_scan + AL_IMD_Neonatal + 
+                                           AL_HistoryAnyDummy +
+                                           ICV_mm3_hasCSF , data=NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_R1_NOEPDS20PLUS)
+```
+
+```{r}
+gvlma(fit_LOGFC_CingVent_R2_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_R1_NOEPDS20PLUS)
+```
+
+```{r}
+summary(fit_LOGFC_CingVent_R2_NOEPDS20PLUS)
+```
+
+FDR correction of p values 
+```{r}
+PforFDR1_NOEPDS20 <- c(.003,.01,.046,.003,.024,.155,.160,.067,.609,.127,.092,
+                       .729,.325,.430,.745,.252,.472,.875)
+p.adjust(PforFDR1_NOEPDS20, method="fdr", n=length(PforFDR1_NOEPDS20))
+```
+
+Plots for supplement
+```{r}
+library(interactions)
+plot_fit_FD_UF_L1_NOEPDS20PLUS <- interact_plot(fit_FD_UF_L1_NOEPDS20PLUS, 
+                                                pred="AL_EPDS_HIGHEST", modx="Shard_Sex",
+                                                partial.residuals=TRUE, 
+                                                interval=TRUE, x.label="EPDS",
+                                                y.label="Mean FD Left Uncinate", 
+                                                legend.main="Sex",
+                                                colors="CUD Bright", point.size=1)+ 
+  scale_y_continuous(limits=c(.16,.26),
+                           breaks=c(.16,.18,.20,.22,.24,.26))+ 
+  scale_x_continuous(limits=c(0,20),breaks=c(0,5,10,15,20))+
+  theme(axis.title=element_text(size=11),aspect.ratio=1)
+plot_fit_FD_UF_L1_NOEPDS20PLUS
+```
+
+```{r}
+library(interactions)
+plot_fit_FD_UF_R1_NOEPDS20PLUS <- interact_plot(fit_FD_UF_R1_NOEPDS20PLUS, 
+                                                pred="AL_EPDS_HIGHEST",
+                                                modx="Shard_Sex", partial.residuals=TRUE, 
+                                                interval=TRUE, 
+                                                x.label="EPDS", y.label="Mean FD Right Uncinate", 
+                                                legend.main="Sex", colors="CUD Bright",point.size=1)+
+  scale_y_continuous(limits=c(.16,.26),
+                           breaks=c(.16,.18,.20,.22,.24,.26))+
+  scale_x_continuous(limits=c(0,20),breaks=c(0,5,10,15,20))+
+  theme(axis.title=element_text(size=11),aspect.ratio=1)
+plot_fit_FD_UF_R1_NOEPDS20PLUS
+```
+
+```{r}
+library(interactions)
+plot_fit_FDC_UF_L2_NOEPDS20PLUS <- interact_plot(fit_FDC_UF_L2_NOEPDS20PLUS, 
+                                                 pred="AL_EPDS_HIGHEST", modx="Shard_Sex", 
+                                                 partial.residuals=TRUE,
+                                                 interval=TRUE, x.label="EPDS x Sex", 
+                                                 y.label="Mean FDC Left Uncinate", 
+                                                 legend.main="Sex", colors="CUD Bright", 
+                                                 point.size=1)+
+  scale_y_continuous(limits=c(.16,.26),
+                           breaks=c(.16,.18,.20,.22,.24,.26))+ 
+  scale_x_continuous(limits=c(0,20),breaks=c(0,5,10,15,20))+
+  theme(axis.title=element_text(size=11),aspect.ratio=1)
+plot_fit_FDC_UF_L2_NOEPDS20PLUS
+```
+
+```{r}
+library(interactions)
+plot_fit_FDC_UF_R1_NOEPDS20PLUS <- interact_plot(fit_FDC_UF_R1_NOEPDS20PLUS, 
+                                                 pred="AL_EPDS_HIGHEST", modx="Shard_Sex",
+                                                 partial.residuals=TRUE, interval=TRUE, 
+                                                 x.label="EPDS", 
+                                                 y.label="Mean FDC Right Uncinate", 
+                                                 legend.main="Sex", 
+                                                 colors="CUD Bright", point.size=1)+ 
+  scale_y_continuous(limits=c(.16,.26),
+                           breaks=c(.16,.18,.20,.22,.24,.26))+ 
+  scale_x_continuous(limits=c(0,20),breaks=c(0,5,10,15,20))+
+  theme(axis.title=element_text(size=11),aspect.ratio=1)
+plot_fit_FDC_UF_R1_NOEPDS20PLUS
+```
+
+
+```{r}
+library(ggplot2)
+library(cowplot)
+library(rlang)
+
+prow4<- plot_grid(
+  plot_fit_FD_UF_L1_NOEPDS20PLUS + theme(legend.position="none"),
+  plot_fit_FD_UF_R1_NOEPDS20PLUS + theme(legend.position="none"),
+  plot_fit_FDC_UF_L2_NOEPDS20PLUS + theme(legend.position="none"),
+  plot_fit_FDC_UF_R1_NOEPDS20PLUS + theme(legend.position="none"),
+  nrow=2)
+
+legend4 <- get_legend(plot_fit_FDC_UF_L2_NOEPDS20PLUS + guides(color=guide_legend(nrow=1)) + 
+                        theme(legend.position="bottom"))
+
+grid4 <- plot_grid(prow4, legend4, ncol=1, rel_heights=c(1,.1))
+grid4
+```
+
+
+```{r}
+ggsave("UF_all_NOHIGHEPDS.pdf", plot=last_plot(), device=NULL)
+```
+
+
+ 
+
+SECONDARY ANALYSIS - DTI 
+
+
+```{r}
+psych::describe(DATAFRAME$mean_FA_UF_L)
+psych::describe(DATAFRAME$mean_FA_UF_R)
+psych::describe(DATAFRAME$mean_FA_CING_Vent_Left)
+psych::describe(DATAFRAME$mean_FA_CING_Vent_Right)
+psych::describe(DATAFRAME$mean_FA_CING_Dors_Left)
+psych::describe(DATAFRAME$mean_FA_CING_Dors_Right)
+```
+
+
+Psych describe does not work (not enough decimal places) so I used hmisc for mean and got sd separately
+```{r}
+Hmisc::describe(DATAFRAME$mean_ADC_UF_L)
+Hmisc::describe(DATAFRAME$mean_ADC_UF_R)
+Hmisc::describe(DATAFRAME$mean_ADC_CING_Vent_Left)
+Hmisc::describe(DATAFRAME$mean_ADC_CING_Vent_Right)
+Hmisc::describe(DATAFRAME$mean_ADC_CING_Dors_Left)
+Hmisc::describe(DATAFRAME$mean_ADC_CING_Dors_Right)
+```
+
+```{r}
+sd(DATAFRAME$mean_ADC_UF_L)
+sd(DATAFRAME$mean_ADC_UF_R)
+sd(DATAFRAME$mean_ADC_CING_Vent_Left)
+sd(DATAFRAME$mean_ADC_CING_Vent_Right)
+sd(DATAFRAME$mean_ADC_CING_Dors_Left)
+sd(DATAFRAME$mean_ADC_CING_Dors_Right)
+```
+
+
+
+
+CHECKING DTI data distribution.
+
+```{r}
+hist(DATAFRAME$mean_FA_UF_L)
+```
+
+```{r}
+hist(DATAFRAME$mean_FA_UF_R)
+```
+
+```{r}
+hist(DATAFRAME$mean_ADC_UF_L)
+```
+
+```{r}
+hist(DATAFRAME$mean_ADC_UF_R)
+```
+
+```{r}
+hist(DATAFRAME$mean_FA_CING_Vent_Left)
+```
+
+```{r}
+hist(DATAFRAME$mean_FA_CING_Vent_Right)
+```
+
+```{r}
+hist(DATAFRAME$mean_FA_CING_Dors_Left)
+```
+
+```{r}
+hist(DATAFRAME$mean_FA_CING_Dors_Right)
+```
+
+```{r}
+hist(DATAFRAME$mean_ADC_CING_Dors_Left)
+```
+
+```{r}
+hist(DATAFRAME$mean_ADC_CING_Dors_Right)
+```
+
+```{r}
+hist(DATAFRAME$mean_ADC_CING_Vent_Left)
+```
+
+```{r}
+hist(DATAFRAME$mean_ADC_CING_Vent_Right)
+```
+
+
+```{r}
+cor1 <- cor.test(DATAFRAME$mean_FA_UF_L, DATAFRAME$mean_FD_UF_L, 
+                  method="spearman", exact=F)
+cor1
+```
+
+```{r}
+cor2 <- cor.test(DATAFRAME$mean_FA_UF_L, DATAFRAME$mean_FDC_UF_L, 
+                  method="spearman", exact=F)
+cor2
+```
+
+```{r}
+cor2a <- cor.test(DATAFRAME$mean_FA_UF_L, DATAFRAME$mean_LOGFC_UF_L, 
+                  method="spearman", exact=F)
+cor2a
+```
+
+```{r}
+cor3 <- cor.test(DATAFRAME$mean_ADC_UF_L, DATAFRAME$mean_FD_UF_L, 
+                  method="spearman", exact=F)
+cor3
+```
+
+```{r}
+cor4 <- cor.test(DATAFRAME$mean_ADC_UF_L, DATAFRAME$mean_FDC_UF_L, 
+                  method="spearman", exact=F)
+cor4
+```
+
+```{r}
+cor4a <- cor.test(DATAFRAME$mean_ADC_UF_L, DATAFRAME$mean_LOGFC_UF_L, 
+                  method="spearman", exact=F)
+cor4a
+```
+
+
+```{r}
+cor5 <- cor.test(DATAFRAME$mean_FA_UF_R, DATAFRAME$mean_FD_UF_R, 
+                  method="spearman", exact=F)
+cor5
+```
+
+```{r}
+cor6 <- cor.test(DATAFRAME$mean_FA_UF_R, DATAFRAME$mean_FDC_UF_R, 
+                  method="spearman", exact=F)
+cor6
+```
+
+```{r}
+cor6a <- cor.test(DATAFRAME$mean_FA_UF_R, DATAFRAME$mean_LOGFC_UF_R, 
+                  method="spearman", exact=F)
+cor6a
+```
+
+```{r}
+cor7 <- cor.test(DATAFRAME$mean_ADC_UF_R, DATAFRAME$mean_FD_UF_R, 
+                  method="spearman", exact=F)
+cor7
+```
+
+```{r}
+cor8 <- cor.test(DATAFRAME$mean_ADC_UF_R, DATAFRAME$mean_FDC_UF_R, 
+                  method="spearman", exact=F)
+cor8
+```
+
+```{r}
+cor8a <- cor.test(DATAFRAME$mean_ADC_UF_R, DATAFRAME$mean_LOGFC_UF_R, 
+                  method="spearman", exact=F)
+cor8a
+```
+
+```{r}
+cor9 <- cor.test(DATAFRAME$mean_FA_CING_Vent_Left, DATAFRAME$mean_FD_CingVent_L, 
+                  method="spearman", exact=F)
+cor9
+```
+
+```{r}
+cor10 <- cor.test(DATAFRAME$mean_FA_CING_Vent_Left, DATAFRAME$mean_FDC_CingVent_L, 
+                  method="spearman", exact=F)
+cor10
+```
+
+```{r}
+cor10a <- cor.test(DATAFRAME$mean_FA_CING_Vent_Left, DATAFRAME$mean_LOGFC_CingVent_L, 
+                  method="spearman", exact=F)
+cor10a
+```
+
+```{r}
+cor11 <- cor.test(DATAFRAME$mean_ADC_CING_Vent_Left, DATAFRAME$mean_FD_CingVent_L, 
+                  method="spearman", exact=F)
+cor11
+```
+
+```{r}
+cor12 <- cor.test(DATAFRAME$mean_ADC_CING_Vent_Left, DATAFRAME$mean_FDC_CingVent_L, 
+                  method="spearman", exact=F)
+cor12
+```
+
+```{r}
+cor12a <- cor.test(DATAFRAME$mean_ADC_CING_Vent_Left, DATAFRAME$mean_LOGFC_CingVent_L, 
+                  method="spearman", exact=F)
+cor12a
+```
+
+
+```{r}
+cor13 <- cor.test(DATAFRAME$mean_FA_CING_Vent_Right, DATAFRAME$mean_FD_CingVent_R, 
+                  method="spearman", exact=F)
+cor13
+```
+
+```{r}
+cor14 <- cor.test(DATAFRAME$mean_FA_CING_Vent_Right, DATAFRAME$mean_FDC_CingVent_R, 
+                  method="spearman", exact=F)
+cor14
+```
+
+```{r}
+cor14a <- cor.test(DATAFRAME$mean_FA_CING_Vent_Right, DATAFRAME$mean_LOGFC_CingVent_R, 
+                  method="spearman", exact=F)
+cor14a
+```
+
+```{r}
+cor15 <- cor.test(DATAFRAME$mean_ADC_CING_Vent_Right, DATAFRAME$mean_FD_CingVent_R, 
+                  method="spearman", exact=F)
+cor15
+```
+
+```{r}
+cor16 <- cor.test(DATAFRAME$mean_ADC_CING_Vent_Right, DATAFRAME$mean_FDC_CingVent_R, 
+                  method="spearman", exact=F)
+cor16
+```
+
+```{r}
+cor16a <- cor.test(DATAFRAME$mean_ADC_CING_Vent_Right, DATAFRAME$mean_LOGFC_CingVent_R, 
+                  method="spearman", exact=F)
+cor16a
+```
+
+
+```{r}
+cor17 <- cor.test(DATAFRAME$mean_FA_CING_Dors_Left, DATAFRAME$mean_FD_CingDors_L, 
+                  method="spearman", exact=F)
+cor17
+```
+
+```{r}
+cor18 <- cor.test(DATAFRAME$mean_FA_CING_Dors_Left, DATAFRAME$mean_FDC_CingDors_L, 
+                  method="spearman", exact=F)
+cor18
+```
+
+```{r}
+cor18a <- cor.test(DATAFRAME$mean_FA_CING_Dors_Left, DATAFRAME$mean_LOGFC_CingDors_L, 
+                  method="spearman", exact=F)
+cor18a
+```
+
+
+```{r}
+cor19 <- cor.test(DATAFRAME$mean_ADC_CING_Dors_Left, DATAFRAME$mean_FD_CingDors_L, 
+                  method="spearman", exact=F)
+cor19
+```
+
+```{r}
+cor20 <- cor.test(DATAFRAME$mean_ADC_CING_Dors_Left, DATAFRAME$mean_FDC_CingDors_L, 
+                  method="spearman", exact=F)
+cor20
+```
+
+```{r}
+cor20a <- cor.test(DATAFRAME$mean_ADC_CING_Dors_Left, DATAFRAME$mean_LOGFC_CingDors_L, 
+                  method="spearman", exact=F)
+cor20a
+```
+
+```{r}
+cor21 <- cor.test(DATAFRAME$mean_FA_CING_Dors_Right, DATAFRAME$mean_FD_CingDors_R, 
+                  method="spearman", exact=F)
+cor21
+```
+
+```{r}
+cor22 <- cor.test(DATAFRAME$mean_FA_CING_Dors_Right, DATAFRAME$mean_FDC_CingDors_R, 
+                  method="spearman", exact=F)
+cor22
+```
+
+```{r}
+cor22a <- cor.test(DATAFRAME$mean_FA_CING_Dors_Right, DATAFRAME$mean_LOGFC_CingDors_R, 
+                  method="spearman", exact=F)
+cor22a
+```
+
+```{r}
+cor23 <- cor.test(DATAFRAME$mean_ADC_CING_Dors_Right, DATAFRAME$mean_FD_CingDors_R, 
+                  method="spearman", exact=F)
+cor23
+```
+
+```{r}
+cor24 <- cor.test(DATAFRAME$mean_ADC_CING_Dors_Right, DATAFRAME$mean_FDC_CingDors_R, 
+                  method="spearman", exact=F)
+cor24
+```
+
+```{r}
+cor24a <- cor.test(DATAFRAME$mean_ADC_CING_Dors_Right, DATAFRAME$mean_LOGFC_CingDors_R, 
+                  method="spearman", exact=F)
+cor24a
+```
+
+
+
+REGRESSION MODELS FOR DIFFUSION
+
+
+```{r}
+fit_FA_UF_L1 <- lm(mean_FA_UF_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                     Shard_GA_at_scan +
+                     AL_IMD_Neonatal + ICV_mm3_hasCSF + AL_HistoryAnyDummy, 
+                   data=DATAFRAME)
+fit_FA_UF_L2 <- lm(mean_FA_UF_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                     Shard_GA_at_scan + 
+                     AL_IMD_Neonatal + ICV_mm3_hasCSF + AL_HistoryAnyDummy, 
+                   data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FA_UF_L1)
+```
+
+```{r}
+gvlma(fit_FA_UF_L2)
+```
+
+```{r}
+summary(fit_FA_UF_L1)
+```
+
+```{r}
+summary(fit_FA_UF_L2)
+```
+
+
+```{r}
+library(interactions)
+plot_fit_FA_UF_L1  <- interact_plot(fit_FA_UF_L1 , pred="AL_EPDS_HIGHEST", modx="Shard_Sex", 
+                                    partial.residuals=TRUE, interval=TRUE, x.label="EPDS",
+                                    y.label="Mean FA Left Uncinate", legend.main="Sex",
+                                    colors="CUD Bright", point.size=1)+ 
+  scale_y_continuous(limits=c(.11,.18),
+                           breaks=c(.11,.12,.13,.14,.15,.16,.17,.18))+
+  scale_x_continuous(limits=c(0,30),breaks=c(0,5,10,15,20,25,30))+
+  theme(axis.title=element_text(size=11),aspect.ratio=1)
+plot_fit_FA_UF_L1 
+```
+
+
+```{r}
+fit_ADC_UF_L1 <- lm(mean_ADC_UF_L ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                      Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + AL_HistoryAnyDummy, 
+                    data=DATAFRAME)
+fit_ADC_UF_L2 <- lm(mean_ADC_UF_L ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                      Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + AL_HistoryAnyDummy, 
+                    data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_ADC_UF_L1)
+```
+
+```{r}
+gvlma(fit_ADC_UF_L2)
+```
+
+```{r}
+summary(fit_ADC_UF_L1)
+```
+
+```{r}
+summary(fit_ADC_UF_L2)
+```
+
+
+
+
+
+```{r}
+fit_FA_UF_R1 <- lm(mean_FA_UF_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                     Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + AL_HistoryAnyDummy, 
+                   data=DATAFRAME)
+fit_FA_UF_R2 <- lm(mean_FA_UF_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                     Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + AL_HistoryAnyDummy, 
+                   data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FA_UF_R1)
+```
+
+```{r}
+gvlma(fit_FA_UF_R2)
+```
+
+```{r}
+summary(fit_FA_UF_R1)
+```
+
+```{r}
+summary(fit_FA_UF_R2)
+```
+
+
+
+```{r}
+library(interactions)
+plot_fit_FA_UF_R1  <- interact_plot(fit_FA_UF_R1 , pred="AL_EPDS_HIGHEST", 
+                                    modx="Shard_Sex", partial.residuals=TRUE, interval=TRUE, 
+                                    x.label="EPDS", 
+                                    y.label="Mean FA Right Uncinate", legend.main="Sex", 
+                                    colors="CUD Bright", point.size=1)+ 
+  scale_y_continuous(limits=c(.11,.18),
+                           breaks=c(.11,.12,.13,.14,.15,.16,.17,.18))+
+  scale_x_continuous(limits=c(0,30),breaks=c(0,5,10,15,20,25,30))+
+  theme(axis.title=element_text(size=11), aspect.ratio=1)
+plot_fit_FA_UF_R1 
+```
+
+
+
+```{r}
+library(ggplot2)
+library(cowplot)
+library(rlang)
+
+prow5<- plot_grid(
+  plot_fit_FA_UF_L1 + theme(legend.position="none"),
+  plot_fit_FA_UF_R1 + theme(legend.position="none"),
+  nrow=1)
+
+legend5 <- get_legend(plot_fit_FA_UF_L1 + guides(color=guide_legend(nrow=1)) + 
+                        theme(legend.position="bottom"))
+
+grid5 <- plot_grid(prow5, legend5, ncol=1, rel_heights=c(1,.1))
+grid5
+```
+
+
+```{r}
+ggsave("UF_FA.pdf", plot=last_plot(), device=NULL)
+```
+
+```{r}
+fit_ADC_UF_R1 <- lm(mean_ADC_UF_R ~ AL_EPDS_HIGHEST+Shard_Sex + Shard_GA_at_birth+ 
+                      Shard_GA_at_scan + 
+                      AL_IMD_Neonatal + ICV_mm3_hasCSF + AL_HistoryAnyDummy, data=DATAFRAME)
+fit_ADC_UF_R2 <- lm(mean_ADC_UF_R ~ AL_EPDS_HIGHEST*Shard_Sex + Shard_GA_at_birth+ 
+                      Shard_GA_at_scan +
+                      AL_IMD_Neonatal + ICV_mm3_hasCSF + AL_HistoryAnyDummy, data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_ADC_UF_R1)
+```
+
+```{r}
+gvlma(fit_ADC_UF_R2)
+```
+
+```{r}
+summary(fit_ADC_UF_R1)
+```
+
+```{r}
+summary(fit_ADC_UF_R2)
+```
+
+
+
+Dorsal cingulum
+
+
+```{r}
+fit_FA_CING_Dors_Left1 <- lm(mean_FA_CING_Dors_Left ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                               Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                               AL_HistoryAnyDummy, 
+                             data=DATAFRAME)
+fit_FA_CING_Dors_Left2 <- lm(mean_FA_CING_Dors_Left ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                               Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                               AL_HistoryAnyDummy, 
+                             data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FA_CING_Dors_Left1)
+```
+
+```{r}
+gvlma(fit_FA_CING_Dors_Left2)
+```
+
+```{r}
+summary(fit_FA_CING_Dors_Left1)
+```
+
+```{r}
+summary(fit_FA_CING_Dors_Left2)
+```
+
+
+
+
+```{r}
+fit_ADC_CING_Dors_Left1 <- lm(mean_ADC_CING_Dors_Left ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                Shard_GA_at_birth+ 
+                                Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                                AL_HistoryAnyDummy, 
+                               data=DATAFRAME)
+fit_ADC_CING_Dors_Left2 <- lm(mean_ADC_CING_Dors_Left ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                Shard_GA_at_birth+ 
+                                Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                                AL_HistoryAnyDummy, 
+                              data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_ADC_CING_Dors_Left1)
+```
+
+```{r}
+gvlma(fit_ADC_CING_Dors_Left2)
+```
+
+```{r}
+summary(fit_ADC_CING_Dors_Left1)
+```
+
+```{r}
+summary(fit_ADC_CING_Dors_Left2)
+```
+
+
+
+
+```{r}
+fit_FA_CING_Dors_Right1 <- lm(mean_FA_CING_Dors_Right ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                Shard_GA_at_birth+ 
+                                Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                                AL_HistoryAnyDummy, 
+                              data=DATAFRAME)
+fit_FA_CING_Dors_Right2 <- lm(mean_FA_CING_Dors_Right ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                Shard_GA_at_birth+
+                                Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                                AL_HistoryAnyDummy, 
+                              data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FA_CING_Dors_Right1)
+```
+
+```{r}
+gvlma(fit_FA_CING_Dors_Right2)
+```
+
+```{r}
+summary(fit_FA_CING_Dors_Right1)
+```
+
+```{r}
+summary(fit_FA_CING_Dors_Right2)
+```
+
+
+
+```{r}
+fit_ADC_CING_Dors_Right1 <- lm(mean_ADC_CING_Dors_Right ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                 Shard_GA_at_birth+
+                                 Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                                 AL_HistoryAnyDummy,
+                               data=DATAFRAME)
+fit_ADC_CING_Dors_Right2 <- lm(mean_ADC_CING_Dors_Right ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                 Shard_GA_at_birth+
+                                 Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                                 AL_HistoryAnyDummy, 
+                               data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_ADC_CING_Dors_Right1)
+```
+
+```{r}
+gvlma(fit_ADC_CING_Dors_Right2)
+```
+
+```{r}
+summary(fit_ADC_CING_Dors_Right1)
+```
+
+```{r}
+summary(fit_ADC_CING_Dors_Right2)
+```
+
+
+
+
+CingVent
+
+
+```{r}
+fit_FA_CING_Vent_Left1 <- lm(mean_FA_CING_Vent_Left ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                               Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                               AL_HistoryAnyDummy, 
+                             data=DATAFRAME)
+fit_FA_CING_Vent_Left2 <- lm(mean_FA_CING_Vent_Left ~ AL_EPDS_HIGHEST*Shard_Sex +
+                               Shard_GA_at_birth+ 
+                               Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF +
+                               AL_HistoryAnyDummy,
+                             data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FA_CING_Vent_Left1)
+```
+
+```{r}
+gvlma(fit_FA_CING_Vent_Left2)
+```
+
+```{r}
+summary(fit_FA_CING_Vent_Left1)
+```
+
+```{r}
+summary(fit_FA_CING_Vent_Left2)
+```
+
+
+
+```{r}
+fit_ADC_CING_Vent_Left1 <- lm(mean_ADC_CING_Vent_Left ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                Shard_GA_at_birth+ 
+                                Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                                AL_HistoryAnyDummy, 
+                              data=DATAFRAME)
+fit_ADC_CING_Vent_Left2 <- lm(mean_ADC_CING_Vent_Left ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                Shard_GA_at_birth+
+                                Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                                AL_HistoryAnyDummy, 
+                              data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_ADC_CING_Vent_Left1)
+```
+
+```{r}
+gvlma(fit_ADC_CING_Vent_Left2)
+```
+
+```{r}
+summary(fit_ADC_CING_Vent_Left1)
+```
+
+```{r}
+summary(fit_ADC_CING_Vent_Left2)
+```
+
+
+
+
+```{r}
+fit_FA_CING_Vent_Right1 <- lm(mean_FA_CING_Vent_Right ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                Shard_GA_at_birth+ 
+                                Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                                AL_HistoryAnyDummy,
+                              data=DATAFRAME)
+fit_FA_CING_Vent_Right2 <- lm(mean_FA_CING_Vent_Right ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                Shard_GA_at_birth+ 
+                                Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                                AL_HistoryAnyDummy,
+                              data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_FA_CING_Vent_Right1)
+```
+
+```{r}
+gvlma(fit_FA_CING_Vent_Right2)
+```
+
+```{r}
+summary(fit_FA_CING_Vent_Right1)
+```
+
+```{r}
+summary(fit_FA_CING_Vent_Right2)
+```
+
+```{r}
+fit_ADC_CING_Vent_Right1 <- lm(mean_ADC_CING_Vent_Right ~ AL_EPDS_HIGHEST+Shard_Sex + 
+                                 Shard_GA_at_birth+ 
+                                 Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                                 AL_HistoryAnyDummy, 
+                               data=DATAFRAME)
+fit_ADC_CING_Vent_Right2 <- lm(mean_ADC_CING_Vent_Right ~ AL_EPDS_HIGHEST*Shard_Sex + 
+                                 Shard_GA_at_birth+ 
+                                 Shard_GA_at_scan + AL_IMD_Neonatal + ICV_mm3_hasCSF + 
+                                 AL_HistoryAnyDummy,
+                               data=DATAFRAME)
+```
+
+```{r}
+gvlma(fit_ADC_CING_Vent_Right1)
+```
+
+```{r}
+gvlma(fit_ADC_CING_Vent_Right2)
+```
+
+```{r}
+summary(fit_ADC_CING_Vent_Right1)
+```
+
+```{r}
+summary(fit_ADC_CING_Vent_Right2)
+```
+
+
+
+FDR correction of p values 
+```{r}
+PforFDR_DTI <- c(.007,.070,.006,.017,.032,.175,.112,.098,.071,.157,.178,.149)
+p.adjust(PforFDR_DTI, method="fdr", n=length(PforFDR1))
+```
+
+
+
+
+
+
+
+# PART 2 
+
+
+Checking relationship with behavioural scores for UF-L FD,  UF_R FD 
+
+
+# Relationship between depression and 18 month outcomes 
+
+
+Subsetting 
+```{r}
+NeurodevDataframe <- DATAFRAME[!is.na(DATAFRAME$cbcl_total_18m_arm_1),]
+```
+
+Checking in Console 
+str(NeurodevDataframe, list.len=ncol(NeurodevDataframe))
+
+
+```{r}
+hist(NeurodevDataframe$cbcl_total_18m_arm_1)
+```
+
+```{r}
+psych::describe(x=NeurodevDataframe$cbcl_total_18m_arm_1)
+```
+
+```{r}
+psych::describeBy(x=NeurodevDataframe$cbcl_total_18m_arm_1, 
+                  group=NeurodevDataframe$AL_EPDS_Highest_11orMore)
+```
+
+
+```{r}
+hist(NeurodevDataframe$cbcl_total_tscore_18m_arm_1)
+```
+
+```{r}
+psych::describe(x=NeurodevDataframe$cbcl_total_tscore_18m_arm_1)
+```
+
+```{r}
+psych::describeBy(x=NeurodevDataframe$cbcl_total_tscore_18m_arm_1, 
+                  group=NeurodevDataframe$AL_EPDS_Highest_11orMore)
+```
+
+Creating categorical variable 
+
+```{r}
+summary(NeurodevDataframe$cbcl_total_tscore_18m_arm_1)
+```
+
+```{r}
+NeurodevDataframe <-NeurodevDataframe %>%
+    mutate(AL_cbcl_total_tscore_Categ = case_when(
+      cbcl_total_tscore_18m_arm_1<=64 ~ 0,
+      cbcl_total_tscore_18m_arm_1>=65 & cbcl_total_tscore_18m_arm_1<=69 ~ 1,
+      cbcl_total_tscore_18m_arm_1>=70 ~ 2,
+      TRUE ~ NA_real_
+      ))
+summary(NeurodevDataframe$AL_cbcl_total_tscore_Categ)
+```
+
+```{r}
+NeurodevDataframe$AL_cbcl_total_tscore_Categ <- factor(NeurodevDataframe$AL_cbcl_total_tscore_Categ, 
+                                                       levels=c(0,1,2),
+                                                       labels=c("Normal", "Borderline", "Clinical"))
+summary(NeurodevDataframe$AL_cbcl_total_tscore_Categ)
+```
+
+Also subsetting into High and Low EPDS
+
+```{r}
+NeurodevDataframe_HighEPDS <- subset(NeurodevDataframe, AL_EPDS_Highest_11orMore=="High")
+```
+
+Ran in console - str(NeurodevDataframe_HighEPDS)
+
+
+```{r}
+NeurodevDataframe_LowEPDS <- subset(NeurodevDataframe, AL_EPDS_Highest_11orMore=="Low")
+```
+
+Ran in console - str(NeurodevDataframe_LowEPDS)
+
+```{r}
+describe(NeurodevDataframe$AL_cbcl_total_tscore_Categ)
+describe(NeurodevDataframe_HighEPDS$AL_cbcl_total_tscore_Categ)
+describe(NeurodevDataframe_LowEPDS$AL_cbcl_total_tscore_Categ)
+```
+
+
+```{r}
+psych::describeBy(x=NeurodevDataframe$cbcl_total_tscore_18m_arm_1, 
+                  group=NeurodevDataframe$AL_EPDS_Highest_11orMore)
+```
+
+
+CBCL internalizing
+
+```{r}
+hist(NeurodevDataframe$cbcl_internalising_tscore_18m_arm_1)
+```
+
+```{r}
+psych::describe(x=NeurodevDataframe$cbcl_internalising_tscore_18m_arm_1)
+```
+
+```{r}
+psych::describeBy(x=NeurodevDataframe$cbcl_internalising_tscore_18m_arm_1, 
+                  group=NeurodevDataframe$AL_EPDS_Highest_11orMore)
+```
+
+```{r}
+NeurodevDataframe <-NeurodevDataframe %>%
+    mutate(AL_cbcl_intern_tscore_Categ = case_when(
+      cbcl_internalising_tscore_18m_arm_1<=64 ~ 0,
+      cbcl_internalising_tscore_18m_arm_1>=65 & cbcl_internalising_tscore_18m_arm_1<=69 ~ 1,
+      cbcl_internalising_tscore_18m_arm_1>=70 ~ 2,
+      TRUE ~ NA_real_
+      ))
+summary(NeurodevDataframe$AL_cbcl_intern_tscore_Categ)
+```
+
+```{r}
+NeurodevDataframe$AL_cbcl_intern_tscore_Categ <- factor(NeurodevDataframe$AL_cbcl_intern_tscore_Categ, 
+                                                        levels=c(0,1,2), 
+                                                        labels=c("Normal", "Borderline", "Clinical"))
+summary(NeurodevDataframe$AL_cbcl_intern_tscore_Categ)
+```
+
+```{r}
+NeurodevDataframe_HighEPDS <- subset(NeurodevDataframe, AL_EPDS_Highest_11orMore=="High")
+```
+
+Ran in console - str(NeurodevDataframe_HighEPDS)
+
+```{r}
+NeurodevDataframe_LowEPDS <- subset(NeurodevDataframe, AL_EPDS_Highest_11orMore=="Low")
+```
+
+Ran in console - str(NeurodevDataframe_LowEPDS)
+
+```{r}
+Hmisc::describe(NeurodevDataframe$AL_cbcl_intern_tscore_Categ)
+Hmisc::describe(NeurodevDataframe_HighEPDS$AL_cbcl_intern_tscore_Categ)
+Hmisc::describe(NeurodevDataframe_LowEPDS$AL_cbcl_intern_tscore_Categ)
+```
+
+
+CBCL externalising
+
+
+```{r}
+hist(NeurodevDataframe$cbcl_externalising_tscore_18m_arm_1)
+```
+
+```{r}
+psych::describe(x=NeurodevDataframe$cbcl_externalising_tscore_18m_arm_1)
+```
+
+```{r}
+psych::describeBy(x=NeurodevDataframe$cbcl_externalising_tscore_18m_arm_1,
+                  group=NeurodevDataframe$AL_EPDS_Highest_11orMore)
+```
+
+```{r}
+NeurodevDataframe <-NeurodevDataframe %>%
+    mutate(AL_cbcl_extern_tscore_Categ = case_when(
+      cbcl_externalising_tscore_18m_arm_1<=64 ~ 0,
+      cbcl_externalising_tscore_18m_arm_1>=65 & cbcl_externalising_tscore_18m_arm_1<=69 ~ 1,
+      cbcl_externalising_tscore_18m_arm_1>=70 ~ 2,
+      TRUE ~ NA_real_
+      ))
+summary(NeurodevDataframe$AL_cbcl_extern_tscore_Categ)
+```
+
+```{r}
+NeurodevDataframe$AL_cbcl_extern_tscore_Categ <- factor(NeurodevDataframe$AL_cbcl_extern_tscore_Categ, 
+                                                        levels=c(0,1,2),
+                                                        labels=c("Normal", "Borderline", "Clinical"))
+summary(NeurodevDataframe$AL_cbcl_extern_tscore_Categ)
+```
+
+```{r}
+NeurodevDataframe_HighEPDS <- subset(NeurodevDataframe, AL_EPDS_Highest_11orMore=="High")
+```
+
+Ran in console - str(NeurodevDataframe_HighEPDS)
+
+```{r}
+NeurodevDataframe_LowEPDS <- subset(NeurodevDataframe, AL_EPDS_Highest_11orMore=="Low")
+```
+
+Ran in console - str(NeurodevDataframe_LowEPDS)
+
+```{r}
+Hmisc::describe(NeurodevDataframe$AL_cbcl_extern_tscore_Categ)
+Hmisc::describe(NeurodevDataframe_HighEPDS$AL_cbcl_extern_tscore_Categ)
+Hmisc::describe(NeurodevDataframe_LowEPDS$AL_cbcl_extern_tscore_Categ)
+```
+
+
+
+```{r}
+hist(NeurodevDataframe$qchat_total_18m_arm_1)
+```
+
+```{r}
+psych::describe(x=NeurodevDataframe$qchat_total_18m_arm_1)
+```
+
+```{r}
+psych::describeBy(x=NeurodevDataframe$qchat_total_18m_arm_1, 
+                  group=NeurodevDataframe$AL_EPDS_Highest_11orMore)
+```
+
+
+```{r}
+hist(NeurodevDataframe$cog_comp_18m_arm_1)
+```
+
+```{r}
+psych::describe(x=NeurodevDataframe$cog_comp_18m_arm_1)
+```
+
+```{r}
+psych::describeBy(x=NeurodevDataframe$cog_comp_18m_arm_1, 
+                  group=NeurodevDataframe$AL_EPDS_Highest_11orMore)
+```
+
+```{r}
+NeurodevDataframe <-NeurodevDataframe %>%
+    mutate(AL_cog_comp_Categ = case_when(
+      cog_comp_18m_arm_1>85 ~ 0,
+      cog_comp_18m_arm_1>=70 & cog_comp_18m_arm_1<=85 ~ 1,
+      cog_comp_18m_arm_1<70 ~ 2,
+      TRUE ~ NA_real_
+      ))
+summary(NeurodevDataframe$AL_cog_comp_Categ)
+```
+
+```{r}
+NeurodevDataframe$AL_cog_comp_Categ <- factor(NeurodevDataframe$AL_cog_comp_Categ,
+                                              levels=c(0,1,2),
+                                              labels=c("Normal", "Mild cog impairment",
+                                                       "Moderate/severe cog impairment"))
+summary(NeurodevDataframe$AL_cog_comp_Categ)
+```
+
+```{r}
+NeurodevDataframe_HighEPDS <- subset(NeurodevDataframe, AL_EPDS_Highest_11orMore=="High")
+```
+
+str(NeurodevDataframe_HighEPDS)
+
+```{r}
+NeurodevDataframe_LowEPDS <- subset(NeurodevDataframe, AL_EPDS_Highest_11orMore=="Low")
+```
+
+str(NeurodevDataframe_LowEPDS)
+
+```{r}
+Hmisc::describe(NeurodevDataframe$AL_cog_comp_Categ)
+Hmisc::describe(NeurodevDataframe_HighEPDS$AL_cog_comp_Categ)
+Hmisc::describe(NeurodevDataframe_LowEPDS$AL_cog_comp_Categ)
+```
+
+Categorical for QCHAT
+
+```{r}
+NeurodevDataframe <-NeurodevDataframe %>%
+    mutate(AL_qchat_Categ = case_when(
+      qchat_total_18m_arm_1<39 ~ 0,
+      qchat_total_18m_arm_1>=39 ~ 1,
+      TRUE ~ NA_real_
+      ))
+summary(NeurodevDataframe$AL_qchat_Categ)
+```
+
+```{r}
+NeurodevDataframe$AL_qchat_Categ <- factor(NeurodevDataframe$AL_qchat_Categ, 
+                                           levels=c(0,1), 
+                                           labels=c("Normal", "High"))
+summary(NeurodevDataframe$AL_qchat_Categ)
+```
+
+```{r}
+NeurodevDataframe_HighEPDS <- subset(NeurodevDataframe, 
+                                     AL_EPDS_Highest_11orMore=="High")
+```
+
+```{r}
+NeurodevDataframe_LowEPDS <- subset(NeurodevDataframe, 
+                                    AL_EPDS_Highest_11orMore=="Low")
+```
+
+
+```{r}
+Hmisc::describe(NeurodevDataframe$AL_qchat_Categ)
+Hmisc::describe(NeurodevDataframe_HighEPDS$AL_qchat_Categ)
+Hmisc::describe(NeurodevDataframe_LowEPDS$AL_qchat_Categ)
+```
+
+
+Age at assessment
+
+```{r}
+psych::describe(x=NeurodevDataframe$corr_age_at_assess_m_18m_arm_1)
+```
+
+```{r}
+psych::describeBy(x=NeurodevDataframe$corr_age_at_assess_m_18m_arm_1,
+                  group=NeurodevDataframe$AL_EPDS_Highest_11orMore)
+```
+
+
+```{r}
+psych::describe(NeurodevDataframe$imdscaore_18m_arm_1)
+psych::describe(NeurodevDataframe_HighEPDS$imdscaore_18m_arm_1)
+psych::describe(NeurodevDataframe_LowEPDS$imdscaore_18m_arm_1)
+```
+
+
+
+```{r}
+Hmisc::describe(NeurodevDataframe$imdquintile_18m_arm_1)
+Hmisc::describe(NeurodevDataframe_HighEPDS$imdquintile_18m_arm_1)
+Hmisc::describe(NeurodevDataframe_LowEPDS$imdquintile_18m_arm_1)
+```
+
+
+
+
+Getting a correlation matrix for variables of interest 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+NeurodevMatrix = subset(NeurodevDataframe, 
+                            select=c(AL_EPDS_HIGHEST,Shard_GA_at_birth,Shard_GA_at_scan,
+                                     imdscaore_18m_arm_1,mother_age_enrolment_arm_1, 
+                                     mother_education_enrolment_arm_1,
+                                     Shard_Birth_Weight,corr_age_at_assess_m_18m_arm_1,cog_comp_18m_arm_1,
+                                     total_sps_home_environment_18m_arm_1,
+                                qchat_total_18m_arm_1,cbcl_total_tscore_18m_arm_1,
+                                cbcl_internalising_tscore_18m_arm_1,cbcl_externalising_tscore_18m_arm_1,
+                                m_parent_style_18m_arm_1,AL_IMD_Neonatal, mean_FD_UF_L, mean_FD_UF_R,
+                                ICV_mm3_hasCSF ))
+ 
+NeurodevMatrixFin <- as.matrix(NeurodevMatrix)
+
+rcorr(NeurodevMatrixFin,  type=c("spearman"))
+```
+
+GVLMA assumption checks were first performed in the console.
+As there were some issues meeting assumptions, I am log-transforming all variables to have if needed
+```{r}
+NeurodevDataframe$Shard_GA_at_birthLog10 <- log10(NeurodevDataframe$Shard_GA_at_birth)
+NeurodevDataframe$corr_age_at_assess_m_18m_arm_1Log10 <- log10(NeurodevDataframe$corr_age_at_assess_m_18m_arm_1+1)
+NeurodevDataframe$cbcl_total_tscore_18m_arm_1Log10 <- log10(NeurodevDataframe$cbcl_total_tscore_18m_arm_1)
+NeurodevDataframe$mean_FD_UF_LLog10 <- log10(NeurodevDataframe$mean_FD_UF_L)
+NeurodevDataframe$mean_FD_UF_RLog10 <- log10(NeurodevDataframe$mean_FD_UF_R)
+NeurodevDataframe$mean_FDC_UF_LLog10 <- log10(NeurodevDataframe$mean_FDC_UF_L)
+NeurodevDataframe$Shard_GA_at_scanLog10 <- log10(NeurodevDataframe$Shard_GA_at_scan)
+NeurodevDataframe$imdscaore_18m_arm_1Log10 <- log10(NeurodevDataframe$imdscaore_18m_arm_1)
+NeurodevDataframe$cog_comp_18m_arm_1Log10 <- log10(NeurodevDataframe$cog_comp_18m_arm_1)
+NeurodevDataframe$mother_age_enrolment_arm_1Log10 <- log10(NeurodevDataframe$mother_age_enrolment_arm_1)
+NeurodevDataframe$cbcl_internalising_tscore_18m_arm_1Log10 <- log10(NeurodevDataframe$cbcl_internalising_tscore_18m_arm_1)
+NeurodevDataframe$cbcl_externalising_tscore_18m_arm_1Log10 <- log10(NeurodevDataframe$cbcl_externalising_tscore_18m_arm_1)
+NeurodevDataframe$qchat_total_18m_arm_1Log10 <- log10(NeurodevDataframe$qchat_total_18m_arm_1)
+NeurodevDataframe$AL_EPDS_HIGHESTLog10 <- log10(NeurodevDataframe$AL_EPDS_HIGHEST+1)
+```
+
+
+
+
+
+Building models and quick check 
+
+QCHAT 
+```{r}
+fit_qchat_FD_UF_L1 <- lm(qchat_total_18m_arm_1 ~ mean_FD_UF_L + Shard_Sex + 
+                           Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                           corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 +
+                           mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+
+fit_qchat_FD_UF_L2 <- lm(qchat_total_18m_arm_1 ~ mean_FD_UF_L * Shard_Sex + 
+                           Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                           corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                           mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+gvlma(fit_qchat_FD_UF_L1)
+```
+
+```{r}
+gvlma(fit_qchat_FD_UF_L2)
+```
+
+
+```{r}
+summary(fit_qchat_FD_UF_L1)
+```
+
+```{r}
+summary(fit_qchat_FD_UF_L2)
+```
+
+```{r}
+library(interactions)
+plot_fit_qchat_FD_UF_L1 <- interact_plot(fit_qchat_FD_UF_L1, pred="mean_FD_UF_L", 
+                                         modx="Shard_Sex", partial.residuals=TRUE, 
+                                         interval=TRUE, x.label="Mean FD Left Uncinate", 
+                                         y.label="Q-CHAT Total", legend.main="Sex",
+                                         colors="CUD Bright", point.size=1)+
+  theme(axis.title=element_text(size=15), aspect.ratio=1)
+plot_fit_qchat_FD_UF_L1
+```
+
+Heteroscesasticity corrected covariance matrix 
+```{r}
+coeftest(fit_qchat_FD_UF_L1, vcov=vcovHC(fit_qchat_FD_UF_L1))
+```
+
+
+
+
+```{r}
+fit_qchat_FD_UF_R1 <- lm(qchat_total_18m_arm_1 ~ mean_FD_UF_R + Shard_Sex + 
+                           Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                           corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                           mother_age_enrolment_arm_1,
+                         data=NeurodevDataframe) 
+
+fit_qchat_FD_UF_R2 <- lm(qchat_total_18m_arm_1 ~ mean_FD_UF_R * Shard_Sex + Shard_GA_at_birth + 
+                           Shard_GA_at_scan + imdscaore_18m_arm_1 + corr_age_at_assess_m_18m_arm_1 + 
+                           cog_comp_18m_arm_1 + mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+gvlma(fit_qchat_FD_UF_R1)
+```
+
+
+```{r}
+gvlma(fit_qchat_FD_UF_R2)
+```
+
+```{r}
+summary(fit_qchat_FD_UF_R1)
+```
+
+```{r}
+summary(fit_qchat_FD_UF_R2)
+```
+
+
+```{r}
+library(interactions)
+plot_fit_qchat_FD_UF_R1 <- interact_plot(fit_qchat_FD_UF_R1, pred="mean_FD_UF_R", 
+                                         modx="Shard_Sex", partial.residuals=TRUE, 
+                                         interval=TRUE, x.label="Mean FD Right Uncinate",
+                                         y.label="QCHAT Total", legend.main="Sex",
+                                         colors="CUD Bright", point.size=1)+
+  theme(axis.title=element_text(size=15), aspect.ratio=1)
+plot_fit_qchat_FD_UF_R1
+```
+
+Heteroscesasticity corrected covariance matrix 
+```{r}
+coeftest(fit_qchat_FD_UF_R1, vcov=vcovHC(fit_qchat_FD_UF_R1))
+```
+
+CBCL intern
+
+```{r}
+fit_CBCLInt_FD_UF_L1 <- lm(cbcl_internalising_tscore_18m_arm_1 ~ mean_FD_UF_L + 
+                             Shard_Sex + Shard_GA_at_birth + Shard_GA_at_scan + 
+                             imdscaore_18m_arm_1 + corr_age_at_assess_m_18m_arm_1 + 
+                             cog_comp_18m_arm_1 + mother_age_enrolment_arm_1, 
+                           data=NeurodevDataframe) 
+
+fit_CBCLInt_FD_UF_L2 <- lm(cbcl_internalising_tscore_18m_arm_1 ~ mean_FD_UF_L * Shard_Sex + 
+                             Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                             corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                             mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+gvlma(fit_CBCLInt_FD_UF_L1)
+```
+
+```{r}
+gvlma(fit_CBCLInt_FD_UF_L2)
+```
+
+```{r}
+summary(fit_CBCLInt_FD_UF_L1)
+```
+
+```{r}
+summary(fit_CBCLInt_FD_UF_L2)
+```
+
+
+
+```{r}
+fit_CBCLInt_FD_UF_R1 <- lm(cbcl_internalising_tscore_18m_arm_1 ~ mean_FD_UF_R + Shard_Sex + 
+                             Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                             corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 +
+                             mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+
+fit_CBCLInt_FD_UF_R2 <- lm(cbcl_internalising_tscore_18m_arm_1 ~ mean_FD_UF_R * Shard_Sex + 
+                             Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                             corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                             mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+gvlma(fit_CBCLInt_FD_UF_R1)
+```
+
+```{r}
+gvlma(fit_CBCLInt_FD_UF_R2)
+```
+
+
+```{r}
+summary(fit_CBCLInt_FD_UF_R1)
+```
+
+
+```{r}
+summary(fit_CBCLInt_FD_UF_R2)
+```
+
+
+Heteroscesasticity corrected covariance matrix 
+```{r}
+coeftest(fit_CBCLInt_FD_UF_R1, vcov=vcovHC(fit_CBCLInt_FD_UF_R1))
+```
+
+
+
+CBCL externalising
+
+```{r}
+fit_CBCLExt_FD_UF_L1 <- lm(cbcl_externalising_tscore_18m_arm_1 ~ mean_FD_UF_L + 
+                             Shard_Sex + Shard_GA_at_birth + Shard_GA_at_scan + 
+                             imdscaore_18m_arm_1 + corr_age_at_assess_m_18m_arm_1 + 
+                             cog_comp_18m_arm_1 + mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+fit_CBCLExt_FD_UF_L2 <- lm(cbcl_externalising_tscore_18m_arm_1 ~ mean_FD_UF_L * Shard_Sex + 
+                             Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                             corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                             mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+gvlma(fit_CBCLExt_FD_UF_L1)
+```
+
+```{r}
+summary(fit_CBCLExt_FD_UF_L1)
+```
+
+```{r}
+summary(fit_CBCLExt_FD_UF_L2)
+```
+
+```{r}
+fit_CBCLExt_FD_UF_R1 <- lm(cbcl_externalising_tscore_18m_arm_1 ~ mean_FD_UF_R + Shard_Sex + 
+                             Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                             corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                             mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+
+fit_CBCLExt_FD_UF_R2 <- lm(cbcl_externalising_tscore_18m_arm_1 ~ mean_FD_UF_R * Shard_Sex + 
+                             Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                             corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                             mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+gvlma(fit_CBCLExt_FD_UF_R1)
+```
+
+```{r}
+gvlma(fit_CBCLExt_FD_UF_R2)
+```
+
+```{r}
+summary(fit_CBCLExt_FD_UF_R1)
+```
+
+```{r}
+summary(fit_CBCLExt_FD_UF_R2)
+```
+
+FDR correction of p values 
+```{r}
+PforFDRNeurodev <- c(.0005, .016, .081, .099,.136,.203)
+p.adjust(PforFDRNeurodev, method="fdr", n=length(PforFDRNeurodev))
+```
+
+
+
+Proper check of assumptions
+
+QCHAT UF-L
+
+Check residuals from model- median should be close to 0. If not, assumptions might be violated. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(fit_qchat_FD_UF_L1)
+```
+
+Check anomalous data - Cook's distance (>1 outlier and high leverage)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_qchat_FD_UF_L1, which=4)
+```
+
+Check normality of residuals 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+hist(x=residuals(fit_qchat_FD_UF_L1), 
+     xlab="Value of residual",
+     main="") 
+```
+
+Check Shapiro-Wilk (not significant, normality assumption is met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+shapiro.test(residuals(fit_qchat_FD_UF_L1)) 
+```
+
+Check linearity of relationship 
+plots residuals vs fitted (ideally, straight horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_qchat_FD_UF_L1, which=1)  
+```
+
+Plot similar to above but for each individual predictor (Check p values, if significant, curvature is significant ( but use judgment)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+residualPlots(model=fit_qchat_FD_UF_L1) 
+```
+
+Check normality assumptions - plot normal Q-Q (Check that follows the line - if yes, met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_qchat_FD_UF_L1, which=2) 
+```
+
+Check homogeneity of variance 
+plots scale-location (Ideally straight, horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_qchat_FD_UF_L1, which=3) 
+```
+
+Non-constant variance score (needs to be non-significant) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_qchat_FD_UF_L1) 
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_qchat_FD_UF_L1)
+```
+
+Check for collinearity (needs to be low - around 1)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+vif(mod=fit_qchat_FD_UF_L1)
+```
+
+
+
+Added variable plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(car) 
+avPlots(fit_qchat_FD_UF_L1, ask=FALSE)
+```
+
+
+
+
+QCHAT UF_R
+
+
+Check residuals from model- median should be close to 0. If not, assumptions might be violated. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(fit_qchat_FD_UF_R1)
+```
+
+
+Check anomalous data - Cook's distance (>1 outlier and high leverage)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_qchat_FD_UF_R1, which=4)
+```
+
+Check normality of residuals 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+hist(x=residuals(fit_qchat_FD_UF_R1), 
+     xlab="Value of residual",
+     main="") 
+```
+
+Check Shapiro-Wilk (not significant, normality assumption is met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+shapiro.test(residuals(fit_qchat_FD_UF_R1)) 
+```
+
+Check linearity of relationship 
+plots residuals vs fitted (ideally, straight horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_qchat_FD_UF_R1, which=1)  
+```
+
+Plot similar to above but for each individual predictor (Check p values, if significant, curvature is significant ( but use judgment)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+residualPlots(model=fit_qchat_FD_UF_R1) 
+```
+
+
+Check normality assumptions - plot normal Q-Q (Check that follows the line - if yes, met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_qchat_FD_UF_R1, which=2) 
+```
+
+Check homogeneity of variance 
+plots scale-location (Ideally straight, horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_qchat_FD_UF_R1, which=3) 
+```
+
+Non-constant variance score (needs to be non-significant) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_qchat_FD_UF_R1) 
+```
+
+Check for collinearity (needs to be low - around 1)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+vif(mod=fit_qchat_FD_UF_R1)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_qchat_FD_UF_R1)
+```
+
+Added variable plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(car) 
+avPlots(fit_qchat_FD_UF_R1, ask=FALSE)
+```
+
+
+
+
+CBCLInt UF-L
+
+Check residuals from model- median should be close to 0. If not, assumptions might be violated. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(fit_CBCLInt_FD_UF_L1)
+```
+
+Check anomalous data - Cook's distance (>1 outlier and high leverage)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLInt_FD_UF_L1, which=4)
+```
+
+Check normality of residuals 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+hist(x=residuals(fit_CBCLInt_FD_UF_L1), 
+     xlab="Value of residual",
+     main="") 
+```
+
+Check Shapiro-Wilk (not significant, normality assumption is met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+shapiro.test(residuals(fit_CBCLInt_FD_UF_L1)) 
+```
+
+Check linearity of relationship 
+plots residuals vs fitted (ideally, straight horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLInt_FD_UF_L1, which=1)  
+```
+
+Plot similar to above but for each individual predictor (Check p values, if significant, curvature is significant ( but use judgment)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+residualPlots(model=fit_CBCLInt_FD_UF_L1) 
+```
+
+
+Check normality assumptions - plot normal Q-Q (Check that follows the line - if yes, met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLInt_FD_UF_L1, which=2) 
+```
+
+Check homogeneity of variance 
+plots scale-location (Ideally straight, horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLInt_FD_UF_L1, which=3) 
+```
+
+Non-constant variance score (needs to be non-significant) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_CBCLInt_FD_UF_L1) 
+```
+
+Check for collinearity (needs to be low - around 1)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+vif(mod=fit_CBCLInt_FD_UF_L1)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_CBCLInt_FD_UF_L1)
+```
+
+
+Added variable plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(car) 
+avPlots(fit_CBCLInt_FD_UF_L1, ask=FALSE)
+```
+
+
+
+
+
+CBCL Int UF_R
+
+
+Check residuals from model- median should be close to 0. If not, assumptions might be violated. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(fit_CBCLInt_FD_UF_R1)
+```
+
+Check anomalous data - Cook's distance (>1 outlier and high leverage)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLInt_FD_UF_R1, which=4)
+```
+
+Check normality of residuals 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+hist(x=residuals(fit_CBCLInt_FD_UF_R1), 
+     xlab="Value of residual",
+     main="") 
+```
+
+Check Shapiro-Wilk (not significant, normality assumption is met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+shapiro.test(residuals(fit_CBCLInt_FD_UF_R1)) 
+```
+
+Check linearity of relationship 
+plots residuals vs fitted (ideally, straight horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLInt_FD_UF_R1, which=1)  
+```
+
+Plot similar to above but for each individual predictor (Check p values, if significant, curvature is significant ( but use judgment)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+residualPlots(model=fit_CBCLInt_FD_UF_R1) 
+```
+
+
+Check normality assumptions - plot normal Q-Q (Check that follows the line - if yes, met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLInt_FD_UF_R1, which=2) 
+```
+
+Check homogeneity of variance 
+plots scale-location (Ideally straight, horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLInt_FD_UF_R1, which=3) 
+```
+
+Non-constant variance score (needs to be non-significant) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_CBCLInt_FD_UF_R1) 
+```
+
+Check for collinearity (needs to be low - around 1)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+vif(mod=fit_CBCLInt_FD_UF_R1)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_CBCLInt_FD_UF_R1)
+```
+
+
+Added variable plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(car) 
+avPlots(fit_CBCLInt_FD_UF_R1, ask=FALSE)
+```
+
+
+
+
+
+
+CBCLExt UF-L
+
+Check residuals from model- median should be close to 0. If not, assumptions might be violated. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(fit_CBCLExt_FD_UF_L1)
+```
+
+Check anomalous data - Cook's distance (>1 outlier and high leverage)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLExt_FD_UF_L1, which=4)
+```
+
+Check normality of residuals 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+hist(x=residuals(fit_CBCLExt_FD_UF_L1), 
+     xlab="Value of residual",
+     main="") 
+```
+
+Check Shapiro-Wilk (not significant, normality assumption is met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+shapiro.test(residuals(fit_CBCLExt_FD_UF_L1)) 
+```
+
+Check linearity of relationship 
+plots residuals vs fitted (ideally, straight horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLExt_FD_UF_L1, which=1)  
+```
+
+Plot similar to above but for each individual predictor (Check p values, if significant, curvature is significant( but use judgment)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+residualPlots(model=fit_CBCLExt_FD_UF_L1) 
+```
+
+
+Check normality assumptions - plot normal Q-Q (Check that follows the line - if yes, met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLExt_FD_UF_L1, which=2) 
+```
+
+Check homogeneity of variance 
+plots scale-location (Ideally straight, horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLExt_FD_UF_L1, which=3) 
+```
+
+Non-constant variance score (needs to be non-significant) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_CBCLExt_FD_UF_L1) 
+```
+
+Check for collinearity (needs to be low - around 1)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+vif(mod=fit_CBCLExt_FD_UF_L1)
+```
+
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_CBCLExt_FD_UF_L1)
+```
+
+
+Added variable plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(car) 
+avPlots(fit_CBCLExt_FD_UF_L1, ask=FALSE)
+```
+
+
+
+
+
+CBCLExt UF_R
+
+
+Check residuals from model- median should be close to 0. If not, assumptions might be violated. 
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+summary(fit_CBCLExt_FD_UF_R1)
+```
+
+
+Check anomalous data - Cook's distance (>1 outlier and high leverage)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLExt_FD_UF_R1, which=4)
+```
+
+Check normality of residuals 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+hist(x=residuals(fit_CBCLExt_FD_UF_R1), 
+     xlab="Value of residual",
+     main="") 
+```
+
+Check Shapiro-Wilk (not significant, normality assumption is met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+shapiro.test(residuals(fit_CBCLExt_FD_UF_R1)) 
+```
+
+Check linearity of relationship 
+plots residuals vs fitted (ideally, straight horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLExt_FD_UF_R1, which=1)  
+```
+
+Plot similar to above but for each individual predictor (Check p values, if significant, curvature is significant ( but use judgment)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+residualPlots(model=fit_CBCLExt_FD_UF_R1) 
+```
+
+Check normality assumptions - plot normal Q-Q (Check that follows the line - if yes, met) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLExt_FD_UF_R1, which=2) 
+```
+
+Check homogeneity of variance 
+plots scale-location (Ideally straight, horizontal line)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(x=fit_CBCLExt_FD_UF_R1, which=3) 
+```
+
+Non-constant variance score (needs to be non-significant) 
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+ncvTest(fit_CBCLExt_FD_UF_R1) 
+```
+
+Check for collinearity (needs to be low - around 1)
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+vif(mod=fit_CBCLExt_FD_UF_R1)
+```
+
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(lmtest)
+bptest(fit_CBCLExt_FD_UF_R1)
+```
+
+Added variable plot
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(car) 
+avPlots(fit_CBCLExt_FD_UF_R1, ask=FALSE)
+```
+
+
+Quick check for outliers and distribution
+
+For skewness
+If the skewness of the variable is 0, the data is perfectly symmetrical,
+If the skewness of the variable is less than -1 or greater than +1, the data is highly skewed,
+If the skewness of the variable is between -1 and -0.5 or between +1 and +0.5 then the data is moderately skewed,
+If the skewness of the variable is -0.5 and +0.5, the data is approximately symmetric.
+
+Qchat 
+```{r}
+hist(NeurodevDataframe$qchat_total_18m_arm_1)
+```
+
+Approximately symmetrical - no need to transform 
+```{r}
+skewness(NeurodevDataframe$qchat_total_18m_arm_1, na.rm=TRUE)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(NeurodevDataframe$qchat_total_18m_arm_1)
+```
+
+```{r}
+OutlierQchat <- subset(NeurodevDataframe, qchat_total_18m_arm_1>58)
+```
+
+Ran in teminal (for privacy reasons)
+str(OutlierQchat$Shard_ParticipantID)
+
+cbcl_internalising_tscore_18m_arm_1
+
+
+```{r}
+hist(NeurodevDataframe$cbcl_internalising_tscore_18m_arm_1)
+```
+
+Approximately symmetrical - no need to transform 
+```{r}
+skewness(NeurodevDataframe$cbcl_internalising_tscore_18m_arm_1, na.rm=TRUE)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(NeurodevDataframe$cbcl_internalising_tscore_18m_arm_1)
+```
+
+```{r}
+OutlierCBCLInt <- subset(NeurodevDataframe, cbcl_internalising_tscore_18m_arm_1>69)
+```
+
+Ran in teminal (for privacy reasons)
+str(OutlierCBCLInt$Shard_ParticipantID)
+
+
+cbcl_externalising_tscore_18m_arm_1
+
+
+```{r}
+hist(NeurodevDataframe$cbcl_externalising_tscore_18m_arm_1)
+```
+
+Approximately symmetrical - no need to transform 
+```{r}
+skewness(NeurodevDataframe$cbcl_externalising_tscore_18m_arm_1, na.rm=TRUE)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(NeurodevDataframe$cbcl_externalising_tscore_18m_arm_1)
+```
+
+
+```{r}
+OutlierCBCLExt <- subset(NeurodevDataframe, cbcl_externalising_tscore_18m_arm_1>69)
+```
+
+Ran in teminal (for privacy reasons)
+str(OutlierCBCLExt$Shard_ParticipantID)
+
+
+
+FD UF-L 
+
+```{r}
+hist(NeurodevDataframe$mean_FD_UF_L)
+```
+
+Approximately symmetrical - no need to transform 
+```{r}
+skewness(NeurodevDataframe$mean_FD_UF_L, na.rm=TRUE)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(NeurodevDataframe$mean_FD_UF_L)
+```
+
+```{r}
+OutlierFD_UF_L <- subset(NeurodevDataframe, mean_FD_UF_L>.26)
+```
+
+Ran in terminal 
+str(OutlierFD_UF_L$Shard_ParticipantID)
+
+```{r}
+OutlierFD_UF_La <- subset(NeurodevDataframe, mean_FD_UF_L<.15)
+```
+
+Ran in terminal
+str(OutlierFD_UF_La$Shard_ParticipantID)
+
+FD_UF_R
+
+```{r}
+hist(NeurodevDataframe$mean_FD_UF_R)
+```
+
+Approximately symmetrical - no need to transform 
+```{r}
+skewness(NeurodevDataframe$mean_FD_UF_R, na.rm=TRUE)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(NeurodevDataframe$mean_FD_UF_R)
+```
+
+```{r}
+OutlierFD_UF_R <- subset(NeurodevDataframe, mean_FD_UF_R>.26)
+```
+
+Ran in terminal 
+str(OutlierFD_UF_R$Shard_ParticipantID)
+
+```{r}
+OutlierFD_UF_Ra <- subset(NeurodevDataframe, mean_FD_UF_R<.15)
+```
+
+Ran in terminal 
+str(OutlierFD_UF_Ra$Shard_ParticipantID) 
+
+GA at birth 
+```{r}
+hist(NeurodevDataframe$Shard_GA_at_birth)
+```
+
+Approximately symmetrical - no need to transform 
+```{r}
+skewness(NeurodevDataframe$Shard_GA_at_birth, na.rm=TRUE)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(NeurodevDataframe$Shard_GA_at_birth)
+```
+
+```{r}
+OutlierGAbirth<- subset(NeurodevDataframe, Shard_GA_at_birth<33)
+```
+
+Ran in terminal
+str(OutlierGAbirth$Shard_ParticipantID)
+
+GA at scan
+```{r}
+hist(NeurodevDataframe$Shard_GA_at_scan)
+```
+
+Approximately symmetrical - no need to transform 
+```{r}
+skewness(NeurodevDataframe$Shard_GA_at_scan, na.rm=TRUE)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(NeurodevDataframe$Shard_GA_at_scan)
+```
+
+
+
+
+
+IMD at 18 months 
+```{r}
+hist(NeurodevDataframe$imdscaore_18m_arm_1 )
+```
+
+Approximately symmetrical - no need to transform 
+```{r}
+skewness(NeurodevDataframe$imdscaore_18m_arm_1, na.rm=TRUE)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(NeurodevDataframe$imdscaore_18m_arm_1)
+```
+
+```{r}
+OutlierIMD<- subset(NeurodevDataframe, imdscaore_18m_arm_1>60)
+```
+
+Ran in terminal 
+str(OutlierIMD$Shard_ParticipantID)
+
+Corrected age at assessment 
+```{r}
+hist(NeurodevDataframe$corr_age_at_assess_m_18m_arm_1)
+```
+
+Approximately symmetrical - no need to transform 
+```{r}
+skewness(NeurodevDataframe$corr_age_at_assess_m_18m_arm_1, na.rm=TRUE)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(NeurodevDataframe$corr_age_at_assess_m_18m_arm_1)
+```
+
+```{r}
+OutlierCorrAge<- subset(NeurodevDataframe, corr_age_at_assess_m_18m_arm_1>23)
+```
+
+Ran in terminal 
+str(OutlierCorrAge$Shard_ParticipantID) 
+
+Cog comp 
+```{r}
+hist(NeurodevDataframe$cog_comp_18m_arm_1)
+```
+
+Approximately symmetrical - no need to transform 
+```{r}
+skewness(NeurodevDataframe$cog_comp_18m_arm_1, na.rm=TRUE)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(NeurodevDataframe$cog_comp_18m_arm_1)
+```
+
+```{r}
+OutlierCog<- subset(NeurodevDataframe, cog_comp_18m_arm_1<71)
+```
+
+Ran in terminal 
+str(OutlierCog$Shard_ParticipantID)
+
+```{r}
+OutlierCoga<- subset(NeurodevDataframe, cog_comp_18m_arm_1>120)
+```
+
+Ran in terminal 
+str(OutlierCoga$Shard_ParticipantID)
+
+Maternal_age 
+
+```{r}
+hist(NeurodevDataframe$mother_age_enrolment_arm_1)
+```
+
+Approximately symmetrical - no need to transform 
+```{r}
+skewness(NeurodevDataframe$mother_age_enrolment_arm_1, na.rm=TRUE)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(NeurodevDataframe$mother_age_enrolment_arm_1)
+```
+
+```{r}
+OutlierMatAge <- subset(NeurodevDataframe, mother_age_enrolment_arm_1<20)
+```
+
+
+Ran in terminal 
+str(OutlierMatAge$Shard_ParticipantID)
+
+
+
+
+
+RUNNING ROBUST REGRESSION 
+
+```{r}
+fit_qchat_FD_UF_L1ROB <- lmrob(qchat_total_18m_arm_1 ~ mean_FD_UF_L + Shard_Sex + 
+                                 Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 +
+                                 corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                                 mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+
+fit_qchat_FD_UF_L2ROB <- lmrob(qchat_total_18m_arm_1 ~ mean_FD_UF_L * Shard_Sex + 
+                                 Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 +
+                                 corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 +
+                                 mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+length(NeurodevDataframe$Shard_ParticipantID)
+```
+
+```{r}
+summary(fit_qchat_FD_UF_L1ROB)
+```
+
+```{r}
+summary(fit_qchat_FD_UF_L2ROB)
+```
+
+```{r}
+library(interactions)
+plot_fit_qchat_FD_UF_L1ROB <- interact_plot(fit_qchat_FD_UF_L1ROB, pred="mean_FD_UF_L", 
+                                            modx="Shard_Sex", partial.residuals=TRUE, 
+                                            interval=TRUE, x.label="Mean FD Left Uncinate", 
+                                            y.label="Q-CHAT Total", legend.main="Sex",
+                                            colors="CUD Bright", point.size=1)+
+  theme(axis.title=element_text(size=15), aspect.ratio=1)
+plot_fit_qchat_FD_UF_L1ROB
+```
+
+
+
+
+
+```{r}
+fit_qchat_FD_UF_R1ROB <- lmrob(qchat_total_18m_arm_1 ~ mean_FD_UF_R + Shard_Sex + 
+                                 Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                                 corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                                 mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+
+fit_qchat_FD_UF_R2ROB <- lmrob(qchat_total_18m_arm_1 ~ mean_FD_UF_R * Shard_Sex + 
+                                 Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                                 corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                                 mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+summary(fit_qchat_FD_UF_R1ROB)
+```
+
+```{r}
+summary(fit_qchat_FD_UF_R2ROB)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(fit_qchat_FD_UF_R1ROB)
+```
+
+```{r}
+fit_CBCLInt_FD_UF_L1ROB <- lmrob(cbcl_internalising_tscore_18m_arm_1 ~ mean_FD_UF_L + 
+                                   Shard_Sex + Shard_GA_at_birth + Shard_GA_at_scan + 
+                                   imdscaore_18m_arm_1 + corr_age_at_assess_m_18m_arm_1 + 
+                                   cog_comp_18m_arm_1 + mother_age_enrolment_arm_1, 
+                                 data=NeurodevDataframe)
+
+fit_CBCLInt_FD_UF_L2ROB <- lmrob(cbcl_internalising_tscore_18m_arm_1 ~ mean_FD_UF_L * Shard_Sex + 
+                                   Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                                   corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                                   mother_age_enrolment_arm_1, data=NeurodevDataframe)
+```
+
+```{r}
+summary(fit_CBCLInt_FD_UF_L1ROB)
+```
+
+```{r}
+summary(fit_CBCLInt_FD_UF_L2ROB)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(fit_CBCLInt_FD_UF_L1ROB)
+```
+
+
+```{r}
+fit_CBCLInt_FD_UF_R1ROB <- lmrob(cbcl_internalising_tscore_18m_arm_1 ~ mean_FD_UF_R + Shard_Sex + 
+                                   Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                                   corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 +
+                                   mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+
+fit_CBCLInt_FD_UF_R2ROB <- lmrob(cbcl_internalising_tscore_18m_arm_1 ~ mean_FD_UF_R * Shard_Sex + 
+                                   Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                                   corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                                   mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+
+```
+
+```{r}
+summary(fit_CBCLInt_FD_UF_R1ROB)
+```
+
+```{r}
+summary(fit_CBCLInt_FD_UF_R2ROB)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(fit_CBCLInt_FD_UF_R1ROB)
+```
+
+```{r}
+fit_CBCLExt_FD_UF_L1ROB <- lmrob(cbcl_externalising_tscore_18m_arm_1 ~ mean_FD_UF_L + Shard_Sex + 
+                                   Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                                   corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 +
+                                   mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+
+fit_CBCLExt_FD_UF_L2ROB <- lmrob(cbcl_externalising_tscore_18m_arm_1 ~ mean_FD_UF_L * Shard_Sex + 
+                                   Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                                   corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                                   mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+summary(fit_CBCLExt_FD_UF_L1ROB)
+```
+
+```{r}
+summary(fit_CBCLExt_FD_UF_L2ROB)
+```
+
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(fit_CBCLExt_FD_UF_L1ROB)
+```
+
+```{r}
+fit_CBCLExt_FD_UF_R1ROB <- lmrob(cbcl_externalising_tscore_18m_arm_1 ~ mean_FD_UF_R + 
+                                   Shard_Sex + Shard_GA_at_birth + Shard_GA_at_scan + 
+                                   imdscaore_18m_arm_1 + corr_age_at_assess_m_18m_arm_1 + 
+                                   cog_comp_18m_arm_1 + mother_age_enrolment_arm_1, 
+                                 data=NeurodevDataframe) 
+
+fit_CBCLExt_FD_UF_R2ROB <- lmrob(cbcl_externalising_tscore_18m_arm_1 ~ mean_FD_UF_R * Shard_Sex + 
+                                   Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                                   corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                                   mother_age_enrolment_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+summary(fit_CBCLExt_FD_UF_R1ROB)
+```
+
+```{r}
+summary(fit_CBCLExt_FD_UF_R2ROB)
+```
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+plot(fit_CBCLExt_FD_UF_L1ROB)
+```
+
+FDR correction of p values 
+```{r}
+PforFDR1 <- c(.0007,.020,.130,.144,.110,.159)
+p.adjust(PforFDR1, method="fdr", n=length(PforFDR1))
+```
+
+
+
+
+
+
+MEDIATION 
+
+
+
+```{r results="hide", warning=FALSE, comment=FALSE, message=FALSE, fig.show='hide'}
+library(MeMoBootR)
+```
+
+
+```{r}
+saved=MeMoBootR::mediation1(y="qchat_total_18m_arm_1",
+                x="AL_EPDS_HIGHEST",
+                m="mean_FD_UF_L",
+                cvs=c("Shard_GA_at_scan", "corr_age_at_assess_m_18m_arm_1"),
+                df=NeurodevDataframe,
+                with_out=T,
+                nboot=5000,
+                conf_level=.95)
+```
+
+Making proper diagram 
+```{r}
+library(diagram)
+data <- c(0, "'.0003'", 0,
+          0, 0, 0, 
+          "'101.27*'", "'.34* (.31*)'", 0)
+M<- matrix (nrow=3, ncol=3, byrow = TRUE, data=data)
+plot<- plotmat (M, pos=c(1,2), 
+                name= c( "mean FD UF-L","EPDS", "Q-CHAT"), 
+                box.type = "rect", box.size = 0.12, box.prop=0.5,  curve=0)
+```
+
+
+
+                
+Check Mahalanobis distance - there are 4 Mahalonobis outliers 
+```{r}
+Hmisc::describe(saved$datascreening$fulldata$badmahal)
+```
+
+There are 22 leverage outliers 
+```{r}
+Hmisc::describe(saved$datascreening$fulldata$badleverage)
+```
+
+There are 15 bad cooks outliers 
+```{r}
+Hmisc::describe(saved$datascreening$fulldata$badcooks)
+```
+
+Summary - how many should be excluded. Anyone with at least 2 outliers should be exlcuded. There are 2 with 2 outliers and 4 with 3 outliers. These would be excluded if we repeat the analysis with with_out = FALSE, but here, we are not excluding outliers
+```{r}
+Hmisc::describe(saved$datascreening$fulldata$totalout)
+```
+
+
+
+Additivity - to check for multicollinearity. Fine. Some high numbers but no so high that it's an issue. 
+```{r}
+saved$datascreening$correl
+```
+
+Linearity - run in console - OK 
+
+saved$datascreening$linearity
+
+Normality - run in console - OK 
+saved$datascreening$normality
+
+Homogeneity - run in console - OK 
+saved$datascreening$homogen
+
+```{r}
+summary(saved$model1)
+summary(saved$model2)
+summary(saved$model3)
+```
+Degrees of freedom calculated as N - K - 1 , where N is the sample size, K is the number of predictors in the model 
+
+c path (EPDS > Q-CHAT). Total effect model (X predicts Y). Most people lean towards this NOT needing to be significant. 
+b=.341 , t(307)=3.003, p=.003
+F(3,307)=7.989, p<.001, Adj R2=.06
+
+a path (EPDS > FD UF). X predicts M 
+b=.0003, t(307)=1.734, p=.083
+F(3,307)=137.2, p<.001, Adj R2=.57
+
+c' path (EPDS (& FD UF) > Q-CHAT). Direct effect model (X predicts Y with M)
+b=.306, t(306)=2.720, p=.007, Adj R2=.09
+
+b path (FD UF (& EPDS) > Q-CHAT)
+b=101.27, t(306)=3.159, p=.002, Adj R2=.09
+
+
+These match the b values for c path, c' path, and a*b
+```{r}
+saved$total.effect; saved$direct.effect ; saved$indirect.effect
+```
+
+Sobel test. First value is Z score; second value is p. Sobel test suggests mediation is not significant. 
+```{r}
+saved$z.score; saved$p.value
+```
+
+Bootstrapped indirect 
+
+```{r}
+saved$boot.results
+```
+
+```{r}
+saved$boot.ci
+```
+
+Report indirect=.035, SE=.02, 95%CI[-.01-.08].
+Confidence interval contains 0, so difficult to say that mediation has occured. 
+
+
+
+
+REPEATING MEDIATION WITHOUT OUTLIERS
+
+```{r}
+saved=MeMoBootR::mediation1(y="qchat_total_18m_arm_1",
+                x="AL_EPDS_HIGHEST",
+                m="mean_FD_UF_L",
+                cvs=c("Shard_GA_at_scan", "corr_age_at_assess_m_18m_arm_1"),
+                df=NeurodevDataframe,
+                with_out=F,
+                nboot=5000,
+                conf_level=.95)
+```
+
+
+
+
+
+
+Additivity - to check for multicollinearity. Fine. High numbers but no so high that it's an issue. 
+```{r}
+saved$datascreening$correl
+```
+
+Linearity - run in console - OK 
+
+saved$datascreening$linearity
+
+
+Normality - run in console - OK 
+saved$datascreening$normality
+
+Homogeneity - run in console - OK 
+saved$datascreening$homogen
+
+```{r}
+summary(saved$model1)
+summary(saved$model2)
+summary(saved$model3)
+```
+
+
+
+These match the b values for c path, c' path, and a*b
+```{r}
+saved$total.effect; saved$direct.effect ; saved$indirect.effect
+```
+
+Sobel test. First value is Z score; second value is p. Sobel test suggests mediation is not significant. 
+```{r}
+saved$z.score; saved$p.value
+```
+
+Bootstrapped indirect 
+
+```{r}
+saved$boot.results
+```
+
+```{r}
+saved$boot.ci
+```
+
+Confidence interval contains 0, so difficult to say that mediation has occured. 
+
+
+
+
+
+Exploratory analysis EPDS-3A 
+
+```{r}
+psych::describe(DATAFRAME$AL_EPDS3A_Highest)
+```
+
+```{r}
+psych::describe(DATAFRAME$AL_EPDS_HIGHEST)
+```
+
+So we want to form 4 groups 
+1) NO = AL_EPDS_HIGHEST < 11 & AL_EPDS3A_Highest < 6 
+2) JUSTDEP = AL_EPDS_HIGHEST > 10 & AL_EPDS3A_Highest < 6 
+3) JUSTANX = AL_EPDS_HIGHEST < 11 & AL_EPDS3A_Highest > 5
+4) DEPANX = AL_EPDS_HIGHEST > 10 & AL_EPDS3A_Highest > 5
+
+
+Create Categories 
+```{r}
+DATAFRAME <- DATAFRAME %>%
+  mutate(EPDSAnxDepCat = case_when(AL_EPDS_HIGHEST<11 & DATAFRAME$AL_EPDS3A_Highest<6 ~ 0, 
+                                   AL_EPDS_HIGHEST>10 & DATAFRAME$AL_EPDS3A_Highest<6 ~ 1,
+                                   AL_EPDS_HIGHEST<11 & DATAFRAME$AL_EPDS3A_Highest>5 ~ 2, 
+                                   AL_EPDS_HIGHEST>10 & DATAFRAME$AL_EPDS3A_Highest>5 ~ 3,
+                                   TRUE ~ NA_real_
+  ))
+```
+
+
+```{r}
+DATAFRAME$EPDSAnxDepCat2 <- factor(DATAFRAME$EPDSAnxDepCat, levels=c(0,1,2,3), 
+                                   labels=c("No", "High EPDS", "High EPDS-3A", "Both"))
+summary(DATAFRAME$EPDSAnxDepCat2)
+```
+
+(just cropping out the NA)
+```{r warning=FALSE}
+RaincloudEPDS3A <- ggplot(DATAFRAME,aes(x=EPDSAnxDepCat2,y=mean_FD_UF_L, fill = EPDSAnxDepCat2, 
+                                        colour=EPDSAnxDepCat2))+
+  geom_flat_violin(position = position_nudge(x = .25, y = 0),adjust =1)+
+  geom_point(position = position_jitter(width = .2), size = .2)+
+  geom_boxplot(aes(x = as.numeric(EPDSAnxDepCat2)+0.25, y =mean_FD_UF_L),outlier.shape = NA, 
+               alpha = 0.3, width = .1, colour = "BLACK") + ylab('Mean FD UF L')+
+  xlab("EPDS")+theme_cowplot()+guides(fill = FALSE, colour = FALSE)+ 
+  scale_y_continuous(limits=c(.16,.26),breaks=c(.16,.18,.20,.22,.24,.26))+
+  scale_fill_manual(values=c("azure4", "cornflowerblue", "firebrick1", "darkorchid3"))+
+  scale_colour_manual(values=c("azure4", "cornflowerblue", "firebrick1","darkorchid3"))+
+  theme(legend.position="none",text=element_text(size=15))
+RaincloudEPDS3A
+```
+
+```{r}
+describeBy(x=DATAFRAME$mean_FD_UF_L, group=DATAFRAME$EPDSAnxDepCat2)
+```
+
+
+(just cropping out NA)
+```{r warning=FALSE}
+Raincloud2EPDS3A <- ggplot(DATAFRAME,aes(x=EPDSAnxDepCat2,y=qchat_total_18m_arm_1, 
+                                         fill = EPDSAnxDepCat2, colour=EPDSAnxDepCat2))+
+  geom_flat_violin(position = position_nudge(x = .25, y = 0),adjust =1)+
+  geom_point(position = position_jitter(width = .2), size = .2)+
+  geom_boxplot(aes(x = as.numeric(EPDSAnxDepCat2)+0.25, y =qchat_total_18m_arm_1),
+               outlier.shape = NA, alpha = 0.3, width = .1, colour = "BLACK") + 
+  ylab('Q-CHAT')+xlab("EPDS")+theme_cowplot()+guides(fill = FALSE, colour = FALSE)+ 
+  scale_y_continuous(limits=c(0,60),breaks=c(0,10,20,30,40,50,60))+
+  scale_fill_manual(values=c("azure4", "cornflowerblue", "firebrick1", "darkorchid3"))+
+  scale_colour_manual(values=c("azure4", "cornflowerblue", "firebrick1","darkorchid3"))+
+  theme(legend.position="none",text=element_text(size=15))
+Raincloud2EPDS3A
+```
+
+```{r}
+describeBy(x=DATAFRAME$qchat_total_18m_arm_1, group=DATAFRAME$EPDSAnxDepCat2)
+```
+
+
+
+Additional sensitivity analysis (controlling for parenting)
+
+First checking SPS home environment 
+```{r}
+psych::describe(NeurodevDataframe$total_sps_home_environment_18m_arm_1)
+```
+
+```{r}
+psych::describeBy(x=NeurodevDataframe$total_sps_home_environment_18m_arm_1, 
+                  group=NeurodevDataframe$AL_EPDS_Highest_11orMore)
+```
+
+
+QCHAT
+```{r}
+fit_qchat_FD_UF_L1ROBSPS <- lmrob(qchat_total_18m_arm_1 ~ mean_FD_UF_L + Shard_Sex +
+                                    Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                                    corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 +
+                                    mother_age_enrolment_arm_1 + total_sps_home_environment_18m_arm_1,
+                                  data=NeurodevDataframe) 
+```
+
+```{r}
+summary(fit_qchat_FD_UF_L1ROBSPS)
+```
+
+
+
+
+```{r}
+fit_qchat_FD_UF_R1ROBSPS <- lmrob(qchat_total_18m_arm_1 ~ mean_FD_UF_R + Shard_Sex + 
+                                    Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 + 
+                                    corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 +
+                                    mother_age_enrolment_arm_1 + total_sps_home_environment_18m_arm_1, 
+                                  data=NeurodevDataframe) 
+```
+
+
+```{r}
+summary(fit_qchat_FD_UF_R1ROBSPS)
+```
+
+
+
+
+
+
+
+
+Additional sensitivity analysis (controlling for parenting)
+
+First checking parenting style
+```{r}
+psych::describe(NeurodevDataframe$m_parent_style_18m_arm_1)
+```
+
+```{r}
+psych::describeBy(x=NeurodevDataframe$m_parent_style_18m_arm_1, 
+                  group=NeurodevDataframe$AL_EPDS_Highest_11orMore)
+```
+
+```{r}
+hist(NeurodevDataframe$m_parent_style_18m_arm_1)
+```
+
+```{r}
+fit_qchat_FD_UF_L1ROBParS <- lmrob(qchat_total_18m_arm_1 ~ mean_FD_UF_L + 
+                                     Shard_Sex + Shard_GA_at_birth + Shard_GA_at_scan + 
+                                     imdscaore_18m_arm_1 + corr_age_at_assess_m_18m_arm_1 + 
+                                     cog_comp_18m_arm_1 + mother_age_enrolment_arm_1 + 
+                                     m_parent_style_18m_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+summary(fit_qchat_FD_UF_L1ROBParS)
+```
+
+
+```{r}
+fit_qchat_FD_UF_R1ROBParS <- lmrob(qchat_total_18m_arm_1 ~ mean_FD_UF_R + Shard_Sex + 
+                                     Shard_GA_at_birth + Shard_GA_at_scan + imdscaore_18m_arm_1 +
+                                     corr_age_at_assess_m_18m_arm_1 + cog_comp_18m_arm_1 + 
+                                     mother_age_enrolment_arm_1 + m_parent_style_18m_arm_1, 
+                                   data=NeurodevDataframe) 
+```
+
+
+```{r}
+summary(fit_qchat_FD_UF_R1ROBParS)
+```
+
+```{r}
+fit_CBCLInt_FD_UF_L1ROBParS <- lmrob(cbcl_internalising_tscore_18m_arm_1 ~ mean_FD_UF_L +
+                                       Shard_Sex + Shard_GA_at_birth + Shard_GA_at_scan +
+                                       imdscaore_18m_arm_1 + corr_age_at_assess_m_18m_arm_1 + 
+                                       cog_comp_18m_arm_1 + mother_age_enrolment_arm_1 + 
+                                       m_parent_style_18m_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+summary(fit_CBCLInt_FD_UF_L1ROBParS)
+```
+
+
+```{r}
+fit_CBCLInt_FD_UF_R1ROBParS <- lmrob(cbcl_internalising_tscore_18m_arm_1 ~ mean_FD_UF_R + 
+                                       Shard_Sex + Shard_GA_at_birth + Shard_GA_at_scan + 
+                                       imdscaore_18m_arm_1 + corr_age_at_assess_m_18m_arm_1 + 
+                                       cog_comp_18m_arm_1 + mother_age_enrolment_arm_1 + 
+                                       m_parent_style_18m_arm_1, data=NeurodevDataframe) 
+```
+
+
+```{r}
+summary(fit_CBCLInt_FD_UF_R1ROBParS)
+```
+
+CBCL EXT
+
+```{r}
+fit_CBCLExt_FD_UF_L1ROBParS <- lmrob(cbcl_externalising_tscore_18m_arm_1 ~ mean_FD_UF_L +
+                                       Shard_Sex + Shard_GA_at_birth + Shard_GA_at_scan + 
+                                       imdscaore_18m_arm_1 + corr_age_at_assess_m_18m_arm_1 + 
+                                       cog_comp_18m_arm_1 + mother_age_enrolment_arm_1 + 
+                                       m_parent_style_18m_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+summary(fit_CBCLExt_FD_UF_L1ROBParS)
+```
+
+
+```{r}
+fit_CBCLExt_FD_UF_R1ROBParS <- lmrob(cbcl_externalising_tscore_18m_arm_1 ~ mean_FD_UF_R + 
+                                       Shard_Sex + Shard_GA_at_birth + Shard_GA_at_scan + 
+                                       imdscaore_18m_arm_1 + corr_age_at_assess_m_18m_arm_1 + 
+                                       cog_comp_18m_arm_1 + mother_age_enrolment_arm_1 + 
+                                       m_parent_style_18m_arm_1, data=NeurodevDataframe) 
+```
+
+```{r}
+summary(fit_CBCLExt_FD_UF_R1ROBParS)
+```
+
+Additional analyses for revisions 
+
+IUGR
+
+```{r}
+DATAFRAME$baby_suspected_iugr_baby_born_arm_1 <- factor(DATAFRAME$baby_suspected_iugr_baby_born_arm_1,
+                                                         levels=c(0,1),labels=c("No","Yes"))
+```
+
+```{r}
+summary(DATAFRAME$baby_suspected_iugr_baby_born_arm_1)
+```
+
+```{r}
+psych::describeBy(x=DATAFRAME$AL_EPDS_HIGHEST, group=DATAFRAME$baby_suspected_iugr_baby_born_arm_1)
+```
+
+```{r}
+psych::describeBy(x=DATAFRAME$mean_FD_UF_R, group=DATAFRAME$baby_suspected_iugr_baby_born_arm_1)
+```
+
+```{r}
+DATAFRAME$mother_pmh_none
+```
+
+
+```{r}
+DATAFRAME$mother_pmh_none <- factor(DATAFRAME$mother_pmh_none,
+                                                         levels=c(0,1),labels=c("Yes","No"))
+```
+
+
+```{r}
+summary(DATAFRAME$mother_pmh_none)
+```
+
+```{r}
+psych::describeBy(x=DATAFRAME$AL_EPDS_HIGHEST, group=DATAFRAME$mother_pmh_none)
+```
+
+```{r}
+psych::describeBy(x=DATAFRAME$mean_FD_UF_R, group=DATAFRAME$mother_pmh_none)
+```
+
+```{r}
+summary(DATAFRAME$mother_parity.enrolment_arm_1)
+```
+
+```{r}
+psych::describeBy(x=DATAFRAME$mother_parity.enrolment_arm_1, group=DATAFRAME$AL_EPDS_Highest_11orMore)
+```
+
+```{r}
+corRevision <- cor.test(DATAFRAME$AL_EPDS_HIGHEST, DATAFRAME$mother_parity.enrolment_arm_1, method="spearman", exact=F)
+corRevision
+```
+
+
+```{r}
+library(sensemakr)
+```
+
+```{r}
+partial_f2(fit_FD_UF_L1)
+```
+
+```{r}
+partial_f2(fit_FD_UF_R1)
+```
+
+```{r}
+partial_f2(fit_FDC_UF_L2)
+```
+```{r}
+partial_f2(fit_FDC_UF_R1)
+partial_f2(fit_FDC_CingDors_L1)
+```
+
+
+Package citation 
+
+```{r}
+citation(package="ggplot2")
+citation(package="janitor")
+citation(package="dplyr")
+citation(package="writexl")
+citation(package="psych")
+citation(package="Hmisc")
+citation(package="plyr")
+citation(package="ggExtra")
+citation(package="doBy")
+citation(package="grid")
+citation(package="car")
+citation(package="emmeans")
+citation(package="sjPlot")
+citation(package="tidyverse")
+citation(package="stargazer")
+citation(package="visreg")
+citation(package="PupillometryR")
+citation(package="cowplot")
+citation(package="mediation")
+citation(package="gvlma")
+citation(package="lmtest")
+citation(package="e1071")
+citation(package="sandwich")
+citation(package="broom")
+citation(package="robustbase")
+citation(package="MeMoBootR")
+```
+
+
+
+
+
+
+
